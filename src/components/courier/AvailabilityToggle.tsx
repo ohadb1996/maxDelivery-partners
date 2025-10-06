@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Power, PowerOff } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface AvailabilityToggleProps {
   isAvailable: boolean;
@@ -13,6 +14,23 @@ export default function AvailabilityToggle({
   onToggle, 
   isLoading 
 }: AvailabilityToggleProps) {
+  const { updateAvailability } = useAuth();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleToggle = async () => {
+    if (isUpdating) return;
+    
+    setIsUpdating(true);
+    try {
+      await updateAvailability(!isAvailable);
+      onToggle();
+    } catch (error) {
+      console.error('Error updating availability:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
       <div className="flex items-center justify-between">
@@ -42,19 +60,15 @@ export default function AvailabilityToggle({
         </div>
         
         <Button
-          onClick={onToggle}
-          disabled={isLoading}
+          onClick={handleToggle}
+          disabled={isLoading || isUpdating}
           className={`px-6 py-3 font-semibold ${
             isAvailable
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-green-500 hover:bg-green-600 text-white'
           }`}
         >
-          {isLoading ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            isAvailable ? 'Go Offline' : 'Go Online'
-          )}
+          {isUpdating ? 'מעדכן...' : isAvailable ? 'Go Offline' : 'Go Online'}
         </Button>
       </div>
     </div>

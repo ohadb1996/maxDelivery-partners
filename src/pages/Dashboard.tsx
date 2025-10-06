@@ -4,50 +4,45 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle, TrendingUp, Package as PackageIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Delivery, Courier, User } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 import AvailabilityToggle from "@/components/courier/AvailabilityToggle";
 import JobCard from "@/components/courier/JobCard";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [courier, setCourier] = useState<Courier | null>(null);
-  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    if (authUser) {
+      loadData();
+      const interval = setInterval(loadData, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [authUser]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Mock data - replace with actual API calls
-      const mockUser: User = {
-        id: "1",
-        email: "courier@example.com",
-        full_name: "John Courier",
-        phone: "+1234567890",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      if (!authUser) return;
       
-      const mockCourier: Courier = {
-        id: "1",
-        created_by: mockUser.email,
-        phone: mockUser.phone || "",
-        vehicle_type: "bike",
-        is_available: true,
-        rating: 4.8,
-        created_at: new Date().toISOString(),
+      // Create courier data from auth user
+      const courierData: Courier = {
+        id: authUser.uid,
+        created_by: authUser.email || "",
+        phone: authUser.phone || "",
+        vehicle_type: "bike", // Default - should be stored in user data
+        is_available: authUser.isAvailable || false,
+        rating: 4.8, // Default - should be calculated from deliveries
+        created_at: authUser.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      setUser(mockUser);
-      setCourier(mockCourier);
+      setCourier(courierData);
       
       // Mock available deliveries
       const mockDeliveries: Delivery[] = [
@@ -92,16 +87,25 @@ export default function Dashboard() {
 
   const toggleAvailability = async () => {
     setIsToggling(true);
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    if (courier) {
-      setCourier({ ...courier, is_available: !courier.is_available });
+    try {
+      if (courier) {
+        setCourier({ ...courier, is_available: !courier.is_available });
+      }
+    } catch (error) {
+      console.error("Error toggling availability:", error);
+    } finally {
+      setIsToggling(false);
     }
-    setIsToggling(false);
   };
 
   const handleJobClick = (delivery: Delivery) => {
     navigate(`/job/${delivery.id}`);
+  };
+
+  const handleAcceptJob = (delivery: Delivery) => {
+    console.log('Accepting job:', delivery.id);
+    // TODO: Implement job acceptance logic
+    // This should update the delivery status and assign it to the courier
   };
 
   if (isLoading) {
@@ -136,7 +140,16 @@ export default function Dashboard() {
           )}
         </div>
 
-        {!courier?.is_available && (
+        {!courier?.is_available && deliveries.length > 0 && (
+          <Alert className="mb-4 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              You have {deliveries.length} available orders, but you need to go online to accept them
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!courier?.is_available && deliveries.length === 0 && (
           <Alert className="mb-4 border-amber-200 bg-amber-50">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
@@ -161,6 +174,7 @@ export default function Dashboard() {
               key={delivery.id}
               delivery={delivery}
               onClick={() => handleJobClick(delivery)}
+              onAccept={() => handleAcceptJob(delivery)}
             />
           ))}
         </div>

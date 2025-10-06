@@ -3,16 +3,21 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock, DollarSign, Navigation, Phone, Package, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MapPin, Clock,  Navigation, Phone, Package, CheckCircle, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Delivery } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 export default function JobDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
+
+  const isAvailable = user?.isAvailable || false;
 
   useEffect(() => {
     loadJobDetails();
@@ -47,6 +52,11 @@ export default function JobDetails() {
   };
 
   const acceptJob = async () => {
+    if (!isAvailable) {
+      console.log('Cannot accept job - user is offline');
+      return;
+    }
+    
     setIsAccepting(true);
     try {
       // Mock API call
@@ -196,15 +206,34 @@ export default function JobDetails() {
           </div>
         </div>
 
+        {/* Availability Alert */}
+        {!isAvailable && (
+          <Alert className="mb-4 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              You need to go online to accept this job. Switch to online mode in the dashboard first.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Button
           onClick={acceptJob}
-          disabled={isAccepting}
-          className="w-full mt-4 font-semibold py-6 text-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+          disabled={isAccepting || !isAvailable}
+          className={`w-full mt-4 font-semibold py-6 text-lg ${
+            isAvailable 
+              ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
+              : 'bg-gray-400 text-gray-600 cursor-not-allowed'
+          }`}
         >
           {isAccepting ? (
             <span className="flex items-center gap-2">
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Accepting...
+            </span>
+          ) : !isAvailable ? (
+            <span className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Go Online to Accept Job
             </span>
           ) : (
             <span className="flex items-center gap-2">

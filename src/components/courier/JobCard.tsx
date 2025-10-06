@@ -1,16 +1,29 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock, DollarSign, Navigation2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MapPin, Clock, DollarSign, Navigation2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Delivery } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 interface JobCardProps {
   delivery: Delivery;
   onClick: () => void;
+  onAccept?: () => void;
 }
 
-export default function JobCard({ delivery, onClick }: JobCardProps) {
+export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
+  const { user } = useAuth();
+  const isAvailable = user?.isAvailable || false;
+
+  const handleAcceptClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    if (isAvailable && onAccept) {
+      onAccept();
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -19,7 +32,11 @@ export default function JobCard({ delivery, onClick }: JobCardProps) {
       whileTap={{ scale: 0.98 }}
     >
       <Card 
-        className="cursor-pointer hover:shadow-lg transition-all border-2 hover:border-blue-300"
+        className={`cursor-pointer hover:shadow-lg transition-all border-2 ${
+          isAvailable 
+            ? 'hover:border-blue-300' 
+            : 'border-gray-200 opacity-75'
+        }`}
         onClick={onClick}
       >
         <CardContent className="p-4">
@@ -77,6 +94,26 @@ export default function JobCard({ delivery, onClick }: JobCardProps) {
                 <Clock className="w-4 h-4" />
                 <span>{delivery.estimated_duration}</span>
               </div>
+            )}
+          </div>
+
+          {/* Accept Button */}
+          <div className="mt-4 pt-3 border-t">
+            {!isAvailable ? (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-gray-400" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-600">Go Online to accept jobs</p>
+                  <p className="text-xs text-gray-500">You need to be available to take new deliveries</p>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={handleAcceptClick}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
+              >
+                Accept this job
+              </Button>
             )}
           </div>
         </CardContent>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Package, History, User as UserIcon } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Package, History, User as UserIcon, LogOut } from "lucide-react";
 import { User, Courier } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,29 +10,24 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user: authUser, logout, isLoading } = useAuth();
   const [courier, setCourier] = useState<Courier | null>(null);
-  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    loadCourierData();
-  }, []);
+    if (authUser) {
+      loadCourierData();
+    }
+  }, [authUser]);
 
   const loadCourierData = async () => {
     try {
       // Mock data for now - replace with actual API calls
-      const mockUser: User = {
-        id: "1",
-        email: "courier@example.com",
-        full_name: "John Courier",
-        phone: "+1234567890",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
+      // This should be replaced with real courier data from the database
       const mockCourier: Courier = {
-        id: "1",
-        created_by: mockUser.email,
-        phone: mockUser.phone || "",
+        id: authUser?.uid || "1",
+        created_by: authUser?.email || "courier@example.com",
+        phone: authUser?.phone || "+1234567890",
         vehicle_type: "bike",
         is_available: true,
         rating: 4.8,
@@ -39,12 +35,39 @@ export default function Layout({ children }: LayoutProps) {
         updated_at: new Date().toISOString(),
       };
 
-      setUser(mockUser);
       setCourier(mockCourier);
     } catch (error) {
       console.error("Error loading courier data:", error);
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !authUser) {
+      navigate('/login');
+    }
+  }, [isLoading, authUser, navigate]);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+          <p className="text-gray-600">טוען...</p>
+        </div>
+      </div>
+    );
+  }
 
   const navItems = [
     { name: "Dashboard", path: "/", icon: Home },
@@ -65,19 +88,28 @@ export default function Layout({ children }: LayoutProps) {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">MaxDelivery Partner</h1>
-                {user && (
-                  <p className="text-xs text-gray-500">Hi, {user.full_name?.split(' ')[0] || 'Courier'}</p>
+                {authUser && (
+                  <p className="text-xs text-gray-500">Hi, {authUser.username || authUser.email?.split('@')[0] || 'Courier'}</p>
                 )}
               </div>
             </div>
-            {courier && (
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${courier.is_available ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
-                <span className={`text-xs font-medium ${courier.is_available ? 'text-green-600' : 'text-gray-500'}`}>
-                  {courier.is_available ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {authUser && (
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
+                  <span className={`text-xs font-medium ${authUser.isAvailable ? 'text-green-600' : 'text-gray-500'}`}>
+                    {authUser.isAvailable ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>התנתקות</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>

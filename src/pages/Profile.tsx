@@ -2,13 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User2, Phone, Star, Package, TrendingUp, LogOut, Bike, Car, Truck } from "lucide-react";
-import { User, Courier, DeliveryStats } from "@/types";
+import { User2, Phone, Star, Package, TrendingUp, Bike, Car, Truck } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Profile() {
-  const [user, setUser] = useState<User | null>(null);
-  const [courier, setCourier] = useState<Courier | null>(null);
-  const [stats, setStats] = useState<DeliveryStats>({ total: 0, thisWeek: 0, rating: 5.0 });
+  const { user } = useAuth();
+  const [courier, setCourier] = useState<any>(null);
+  const [stats, setStats] = useState({ total: 0, thisWeek: 0, rating: 5.0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -17,28 +17,24 @@ export default function Profile() {
 
   const loadProfile = async () => {
     try {
-      // Mock data - replace with actual API calls
-      const mockUser: User = {
-        id: "1",
-        email: "courier@example.com",
-        full_name: "John Courier",
-        phone: "+1234567890",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      const mockCourier: Courier = {
-        id: "1",
-        created_by: mockUser.email,
-        phone: mockUser.phone || "",
+      if (!user) {
+        console.log("No user data available");
+        setIsLoading(false);
+        return;
+      }
+
+      // Mock courier data - replace with actual API calls
+      const mockCourier = {
+        id: user.uid,
+        created_by: user.email,
+        phone: user.phone || "",
         vehicle_type: "bike",
         is_available: true,
         rating: 4.8,
-        created_at: new Date().toISOString(),
+        created_at: user.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      setUser(mockUser);
       setCourier(mockCourier);
       setStats({
         total: 127,
@@ -47,17 +43,8 @@ export default function Profile() {
       });
     } catch (error) {
       console.error("Error loading profile:", error);
-    }
-    setIsLoading(false);
-  };
-
-  const handleLogout = async () => {
-    try {
-      // Mock logout - replace with actual logout logic
-      console.log("Logging out...");
-      // Redirect to login page or handle logout
-    } catch (error) {
-      console.error("Error logging out:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -92,12 +79,17 @@ export default function Profile() {
               <User2 className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900 mb-1">{user?.full_name}</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">
+                {user?.firstName && user?.lastName 
+                  ? `${user.firstName} ${user.lastName}` 
+                  : user?.username || 'משתמש'
+                }
+              </h3>
               <p className="text-gray-600 mb-2">{user?.email}</p>
-              {courier?.phone && (
+              {user?.phone && (
                 <div className="flex items-center gap-1 text-sm text-gray-600">
                   <Phone className="w-3 h-3" />
-                  {courier.phone}
+                  {user.phone}
                 </div>
               )}
             </div>
@@ -141,19 +133,6 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="border-red-200">
-        <CardContent className="p-4">
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="w-full border-red-300 text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }

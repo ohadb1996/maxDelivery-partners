@@ -1,24 +1,52 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
 import ActiveJob from './pages/ActiveJob'
 import History from './pages/History'
 import Profile from './pages/Profile'
 import JobDetails from './pages/JobDetails'
+import Login from './pages/Login'
+import Register from './pages/Register'
 
 function App() {
   return (
-    <Router>
-      <Layout>
+    <AuthProvider>
+      <Router>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/active" element={<ActiveJob />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/job/:id" element={<JobDetails />} />
+          {/* Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected Routes */}
+          <Route path="/" element={
+            <Layout>
+              <Dashboard />
+            </Layout>
+          } />
+          <Route path="/active" element={
+            <Layout>
+              <ActiveJob />
+            </Layout>
+          } />
+          <Route path="/history" element={
+            <Layout>
+              <History />
+            </Layout>
+          } />
+          <Route path="/profile" element={
+            <Layout>
+              <Profile />
+            </Layout>
+          } />
+          <Route path="/job/:id" element={
+            <Layout>
+              <JobDetails />
+            </Layout>
+          } />
         </Routes>
-      </Layout>
-    </Router>
+      </Router>
+    </AuthProvider>
   )
 }
 
