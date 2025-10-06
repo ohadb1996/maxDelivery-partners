@@ -7,11 +7,26 @@ export interface User {
   updated_at: string;
 }
 
+export type VehicleType = 'bike' | 'motorcycle' | 'car' | 'truck';
+
+// היררכיה של רכבים - כל רמה יכולה לקחת משלוחים של הרמות הנמוכות ממנה
+export const VEHICLE_HIERARCHY: Record<VehicleType, number> = {
+  bike: 1,
+  motorcycle: 2,
+  car: 3,
+  truck: 4
+};
+
+// פונקציה לבדיקה אם רכב יכול לקחת משלוח מסוים
+export const canVehicleTakeDelivery = (courierVehicle: VehicleType, requiredVehicle: VehicleType): boolean => {
+  return VEHICLE_HIERARCHY[courierVehicle] >= VEHICLE_HIERARCHY[requiredVehicle];
+};
+
 export interface Courier {
   id: string;
   created_by: string;
   phone: string;
-  vehicle_type: 'bike' | 'motorcycle' | 'car' | 'van';
+  vehicle_type: VehicleType;
   is_available: boolean;
   rating?: number;
   created_at: string;
@@ -31,6 +46,7 @@ export interface Delivery {
   payment_amount?: number;
   status: 'available' | 'accepted' | 'arrived_pickup' | 'picked_up' | 'arrived_delivery' | 'delivered' | 'cancelled';
   assigned_courier?: string;
+  required_vehicle_type: VehicleType; // רמת הרכב הנדרשת למשלוח
   accepted_time?: string;
   pickup_time?: string;
   delivery_time?: string;

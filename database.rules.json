@@ -11,6 +11,10 @@
         "lastStatusUpdate": {
           ".read": "auth != null",
           ".write": "auth != null && auth.uid == $uid"
+        },
+        "vehicle_type": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $uid"
         }
       }
     },

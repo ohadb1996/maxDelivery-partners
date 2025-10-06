@@ -12,8 +12,10 @@ import {
   signUpWithEmailAndPass, 
   SignUpParams,
   updateUserEmail,
-  sendVerificationEmail
+  sendVerificationEmail,
+  getCourierVehicleType
 } from '../api/authFiles/AuthFuncs';
+import { VehicleType } from '@/types';
 
 // Types
 interface AuthUser extends User {
@@ -27,6 +29,7 @@ interface AuthUser extends User {
   lastLogin?: string;
   isAvailable?: boolean;
   lastStatusUpdate?: string;
+  vehicle_type?: VehicleType;
 }
 
 interface AuthContextType {
@@ -47,6 +50,9 @@ interface AuthContextType {
   
   // Availability methods
   updateAvailability: (isAvailable: boolean) => Promise<void>;
+  
+  // Vehicle type methods
+  updateVehicleType: (vehicleType: VehicleType) => Promise<void>;
   
   // Navigation helpers
   clearAuthInProgress: () => void;
@@ -123,20 +129,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userData = snapshot.val();
         console.log('[AuthContext] User data loaded:', userData);
         
-            const authUser = {
-              ...firebaseUser,
-              username: userData.username,
-              firstName: userData.firstName,
-              lastName: userData.lastName,
-              phone: userData.phone,
-              address: userData.address,
-              country: userData.country,
-              createdAt: userData.createdAt,
-              lastLogin: userData.lastLogin,
-              isAvailable: userData.isAvailable || false,
-              lastStatusUpdate: userData.lastStatusUpdate
-            };
-        console.log('[AuthContext] Setting user with username:', authUser.username);
+        // טעינת רמת התחבורה
+        let vehicleType: VehicleType = 'bike'; // ברירת מחדל
+        try {
+          vehicleType = await getCourierVehicleType(firebaseUser.uid);
+        } catch (error) {
+          console.log('[AuthContext] Using default vehicle type:', error);
+        }
+        
+        const authUser = {
+          ...firebaseUser,
+          username: userData.username,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          phone: userData.phone,
+          address: userData.address,
+          country: userData.country,
+          createdAt: userData.createdAt,
+          lastLogin: userData.lastLogin,
+          isAvailable: userData.isAvailable || false,
+          lastStatusUpdate: userData.lastStatusUpdate,
+          vehicle_type: vehicleType
+        };
+        console.log('[AuthContext] Setting user with username:', authUser.username, 'vehicle_type:', authUser.vehicle_type);
         setUser(authUser);
       } else {
         console.log('[AuthContext] No user data found in database');
@@ -361,6 +376,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Update vehicle type
+  const updateVehicleType = async (vehicleType: VehicleType): Promise<void> => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      const { updateCourierVehicleType } = await import('../api/authFiles/AuthFuncs');
+      await updateCourierVehicleType(user.uid, vehicleType);
+      
+      // Update local user state
+      setUser(prev => prev ? { ...prev, vehicle_type: vehicleType } : null);
+      
+      console.log('[AuthContext] Vehicle type updated:', vehicleType);
+    } catch (error) {
+      console.error('Error updating vehicle type:', error);
+      throw error;
+    }
+  };
+
   // Clear auth in progress (for navigation handling)
   const clearAuthInProgress = (): void => {
     console.log('[AuthContext] Clearing auth in progress state');
@@ -386,6 +419,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     // Availability methods
     updateAvailability,
+    
+    // Vehicle type methods
+    updateVehicleType,
     
     // Navigation helpers
     clearAuthInProgress,

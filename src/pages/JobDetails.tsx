@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MapPin, Clock,  Navigation, Phone, Package, CheckCircle, AlertCircle } from "lucide-react";
+import { MapPin, Clock, Navigation, Phone, Package, CheckCircle, AlertCircle, Bike, Car, Truck } from "lucide-react";
 import { motion } from "framer-motion";
-import { Delivery } from "@/types";
+import { Delivery, VehicleType, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 export default function JobDetails() {
@@ -18,6 +18,8 @@ export default function JobDetails() {
   const [isAccepting, setIsAccepting] = useState(false);
 
   const isAvailable = user?.isAvailable || false;
+  const courierVehicleType: VehicleType = user?.vehicle_type || 'bike'; // שימוש ברמת התחבורה האמיתית
+  const canTakeThisDelivery = delivery ? canVehicleTakeDelivery(courierVehicleType, delivery.required_vehicle_type) : false;
 
   useEffect(() => {
     loadJobDetails();
@@ -37,6 +39,7 @@ export default function JobDetails() {
         delivery_address: "456 Oak Ave, Uptown",
         payment_amount: 15.50,
         status: "available",
+        required_vehicle_type: "car", // דוגמה - משלוח שדורש רכב
         estimated_distance: "2.3 km",
         estimated_duration: "15 min",
         delivery_notes: "Please ring the doorbell twice",
@@ -51,9 +54,28 @@ export default function JobDetails() {
     setIsLoading(false);
   };
 
+  const vehicleIcons = {
+    bike: Bike,
+    motorcycle: Bike, // נשתמש באייקון אופניים לאופנוע
+    car: Car,
+    truck: Truck
+  };
+
+  const vehicleLabels = {
+    bike: 'אופניים',
+    motorcycle: 'אופנוע',
+    car: 'רכב',
+    truck: 'משאית'
+  };
+
   const acceptJob = async () => {
     if (!isAvailable) {
       console.log('Cannot accept job - user is offline');
+      return;
+    }
+
+    if (!canTakeThisDelivery) {
+      console.log('Cannot accept job - vehicle type not suitable');
       return;
     }
     
@@ -113,11 +135,29 @@ export default function JobDetails() {
                 </Badge>
                 <h2 className="text-xl font-bold text-gray-900">{delivery.customer_name}</h2>
                 <p className="text-gray-600">{delivery.package_description}</p>
+                
+                {/* רמת התחבורה הנדרשת */}
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                    {(() => {
+                      const Icon = vehicleIcons[delivery.required_vehicle_type];
+                      return <Icon className="w-3 h-3 mr-1" />;
+                    })()}
+                    נדרש: {vehicleLabels[delivery.required_vehicle_type]}
+                  </Badge>
+                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                    {(() => {
+                      const Icon = vehicleIcons[courierVehicleType];
+                      return <Icon className="w-3 h-3 mr-1" />;
+                    })()}
+                    שלך: {vehicleLabels[courierVehicleType]}
+                  </Badge>
+                </div>
               </div>
               {delivery.payment_amount && (
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Earning</p>
-                  <p className="text-lg font-bold text-green-600">${delivery.payment_amount}</p>
+                  <p className="text-xs text-gray-500">השתכרות</p>
+                  <p className="text-lg font-bold text-green-600">₪{delivery.payment_amount}</p>
                 </div>
               )}
             </div>
@@ -133,7 +173,7 @@ export default function JobDetails() {
                   <Package className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">Pickup Location</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">מיקום איסוף</h3>
                   <p className="text-gray-700 mb-2">{delivery.pickup_address}</p>
                   {delivery.pickup_phone && (
                     <a href={`tel:${delivery.pickup_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
@@ -148,8 +188,8 @@ export default function JobDetails() {
                 variant="outline"
                 className="w-full mt-3 border-blue-300 text-blue-600 hover:bg-blue-50"
               >
-                <Navigation className="w-4 h-4 mr-2" />
-                Navigate to Pickup
+                <Navigation className="w-4 h-4 ml-2" />
+                ניווט לאיסוף
               </Button>
             </CardContent>
           </Card>
@@ -162,7 +202,7 @@ export default function JobDetails() {
                   <MapPin className="w-5 h-5 text-green-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">Delivery Location</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">מיקום משלוח</h3>
                   <p className="text-gray-700 mb-2">{delivery.delivery_address}</p>
                   <a href={`tel:${delivery.customer_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
                     <Phone className="w-3 h-3" />
@@ -175,8 +215,8 @@ export default function JobDetails() {
                 variant="outline"
                 className="w-full mt-3 border-green-300 text-green-600 hover:bg-green-50"
               >
-                <Navigation className="w-4 h-4 mr-2" />
-                Navigate to Delivery
+                <Navigation className="w-4 h-4 ml-2" />
+                ניווט למשלוח
               </Button>
             </CardContent>
           </Card>
@@ -184,7 +224,7 @@ export default function JobDetails() {
           {delivery.delivery_notes && (
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-1">Special Instructions</h3>
+                <h3 className="font-semibold text-gray-900 mb-1">הוראות מיוחדות</h3>
                 <p className="text-gray-700">{delivery.delivery_notes}</p>
               </CardContent>
             </Card>
@@ -211,16 +251,27 @@ export default function JobDetails() {
           <Alert className="mb-4 border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
-              You need to go online to accept this job. Switch to online mode in the dashboard first.
+              אתה צריך להיות זמין כדי לקבל את המשלוח הזה. עבור למצב זמין בדשבורד תחילה.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Vehicle Type Alert */}
+        {!canTakeThisDelivery && (
+          <Alert className="mb-4 border-orange-200 bg-orange-50">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              המשלוח הזה דורש {vehicleLabels[delivery.required_vehicle_type]} או רכב ברמה גבוהה יותר. 
+              הרכב שלך ({vehicleLabels[courierVehicleType]}) לא מתאים למשלוח זה.
             </AlertDescription>
           </Alert>
         )}
 
         <Button
           onClick={acceptJob}
-          disabled={isAccepting || !isAvailable}
+          disabled={isAccepting || !isAvailable || !canTakeThisDelivery}
           className={`w-full mt-4 font-semibold py-6 text-lg ${
-            isAvailable 
+            isAvailable && canTakeThisDelivery
               ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
               : 'bg-gray-400 text-gray-600 cursor-not-allowed'
           }`}
@@ -228,17 +279,22 @@ export default function JobDetails() {
           {isAccepting ? (
             <span className="flex items-center gap-2">
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Accepting...
+              מקבל...
             </span>
           ) : !isAvailable ? (
             <span className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5" />
-              Go Online to Accept Job
+              עבור למצב זמין כדי לקבל משלוח
+            </span>
+          ) : !canTakeThisDelivery ? (
+            <span className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              סוג הרכב לא מתאים
             </span>
           ) : (
             <span className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              Accept This Job
+              קבל את המשלוח הזה
             </span>
           )}
         </Button>

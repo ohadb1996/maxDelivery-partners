@@ -12,6 +12,7 @@ import {
 import { update, ref, get, onValue } from "firebase/database";
 import { auth, db } from "../config/firebase.config";
 import { CountryCode, validatePhoneNumber } from "../utils/phoneValidity";
+import { VehicleType } from "@/types";
 
 export interface SignUpParams {
   email: string;
@@ -577,4 +578,69 @@ export const confirmPasswordReset = async (actionCode: string, newPassword: stri
     console.error('[AuthFuncs] Failed to confirm password reset:', error);
     throw error;
   }
+};
+
+// ===== פונקציות ניהול רמת תחבורה =====
+
+/**
+ * מעדכן את רמת התחבורה של הקוריר ב-Firebase
+ */
+export const updateCourierVehicleType = async (userId: string, vehicleType: VehicleType): Promise<void> => {
+  try {
+    console.log('[AuthFuncs] Updating courier vehicle type:', { userId, vehicleType });
+    
+    const updates = {
+      [`Users/${userId}/vehicle_type`]: vehicleType,
+    };
+    
+    await update(ref(db), updates);
+    console.log('[AuthFuncs] Courier vehicle type updated successfully');
+  } catch (error) {
+    console.error('[AuthFuncs] Error updating courier vehicle type:', error);
+    throw error;
+  }
+};
+
+/**
+ * מקבל את רמת התחבורה הנוכחית של הקוריר
+ */
+export const getCourierVehicleType = async (userId: string): Promise<VehicleType> => {
+  try {
+    const userRef = ref(db, `Users/${userId}/vehicle_type`);
+    const snapshot = await get(userRef);
+    
+    if (snapshot.exists()) {
+      const vehicleType = snapshot.val();
+      // בדיקה שהערך תקין
+      if (['bike', 'motorcycle', 'car', 'truck'].includes(vehicleType)) {
+        return vehicleType as VehicleType;
+      }
+    }
+    
+    // ברירת מחדל - אופניים
+    return 'bike';
+  } catch (error) {
+    console.error('[AuthFuncs] Error getting courier vehicle type:', error);
+    return 'bike';
+  }
+};
+
+/**
+ * מאזין לשינויים ברמת התחבורה
+ */
+export const onCourierVehicleTypeChange = (userId: string, callback: (vehicleType: VehicleType) => void) => {
+  const userRef = ref(db, `Users/${userId}/vehicle_type`);
+  
+  return onValue(userRef, (snapshot) => {
+    if (snapshot.exists()) {
+      const vehicleType = snapshot.val();
+      if (['bike', 'motorcycle', 'car', 'truck'].includes(vehicleType)) {
+        callback(vehicleType as VehicleType);
+      } else {
+        callback('bike'); // ברירת מחדל
+      }
+    } else {
+      callback('bike'); // ברירת מחדל
+    }
+  });
 };

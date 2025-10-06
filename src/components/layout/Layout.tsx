@@ -70,10 +70,10 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   const navItems = [
-    { name: "Dashboard", path: "/", icon: Home },
-    { name: "Active", path: "/active", icon: Package },
-    { name: "History", path: "/history", icon: History },
-    { name: "Profile", path: "/profile", icon: UserIcon },
+    { name: "דשבורד", path: "/", icon: Home },
+    { name: "פעיל", path: "/active", icon: Package },
+    { name: "היסטוריה", path: "/history", icon: History },
+    { name: "פרופיל", path: "/profile", icon: UserIcon },
   ];
 
   return (
@@ -86,10 +86,10 @@ export default function Layout({ children }: LayoutProps) {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
                 <Package className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">MaxDelivery Partner</h1>
+              <div className="text-right">
+                <h1 className="text-lg font-bold text-gray-900">MaxDelivery שותף</h1>
                 {authUser && (
-                  <p className="text-xs text-gray-500">Hi, {authUser.username || authUser.email?.split('@')[0] || 'Courier'}</p>
+                  <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>
                 )}
               </div>
             </div>

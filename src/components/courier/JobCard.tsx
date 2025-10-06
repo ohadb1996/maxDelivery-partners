@@ -2,9 +2,9 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, DollarSign, Navigation2, AlertCircle } from "lucide-react";
+import { MapPin, Clock, DollarSign, Navigation2, AlertCircle, Bike, Car, Truck } from "lucide-react";
 import { motion } from "framer-motion";
-import { Delivery } from "@/types";
+import { Delivery, VehicleType } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 interface JobCardProps {
@@ -16,6 +16,20 @@ interface JobCardProps {
 export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
   const { user } = useAuth();
   const isAvailable = user?.isAvailable || false;
+
+  const vehicleIcons = {
+    bike: Bike,
+    motorcycle: Bike, // נשתמש באייקון אופניים לאופנוע
+    car: Car,
+    truck: Truck
+  };
+
+  const vehicleLabels = {
+    bike: 'אופניים',
+    motorcycle: 'אופנוע',
+    car: 'רכב',
+    truck: 'משאית'
+  };
 
   const handleAcceptClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click
@@ -52,6 +66,13 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
                     ${delivery.payment_amount}
                   </Badge>
                 )}
+                <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                  {(() => {
+                    const Icon = vehicleIcons[delivery.required_vehicle_type];
+                    return <Icon className="w-3 h-3 mr-1" />;
+                  })()}
+                  {vehicleLabels[delivery.required_vehicle_type]}
+                </Badge>
               </div>
               <h3 className="font-semibold text-gray-900 text-lg">{delivery.customer_name}</h3>
               <p className="text-sm text-gray-600">{delivery.package_description}</p>
@@ -64,7 +85,7 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
                 <div className="w-2 h-2 bg-blue-600 rounded-full" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 mb-0.5">Pickup</p>
+                <p className="text-xs text-gray-500 mb-0.5">איסוף</p>
                 <p className="text-sm font-medium text-gray-900 truncate">{delivery.pickup_address}</p>
               </div>
             </div>
@@ -76,7 +97,7 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
             <div className="flex items-start gap-2">
               <MapPin className="w-6 h-6 text-green-600 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 mb-0.5">Delivery</p>
+                <p className="text-xs text-gray-500 mb-0.5">משלוח</p>
                 <p className="text-sm font-medium text-gray-900 truncate">{delivery.delivery_address}</p>
               </div>
             </div>
@@ -103,8 +124,8 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
               <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-gray-400" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-600">Go Online to accept jobs</p>
-                  <p className="text-xs text-gray-500">You need to be available to take new deliveries</p>
+                  <p className="text-sm font-medium text-gray-600">עבור למצב זמין כדי לקבל משלוחים</p>
+                  <p className="text-xs text-gray-500">אתה צריך להיות זמין כדי לקבל משלוחים חדשים</p>
                 </div>
               </div>
             ) : (
@@ -112,7 +133,7 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
                 onClick={handleAcceptClick}
                 className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
               >
-                Accept this job
+                קבל את המשלוח הזה
               </Button>
             )}
           </div>

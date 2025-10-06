@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, TrendingUp, Package as PackageIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Delivery, Courier, User } from "@/types";
+import { Delivery, Courier, User, VehicleType, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 import AvailabilityToggle from "@/components/courier/AvailabilityToggle";
@@ -35,7 +35,7 @@ export default function Dashboard() {
         id: authUser.uid,
         created_by: authUser.email || "",
         phone: authUser.phone || "",
-        vehicle_type: "bike", // Default - should be stored in user data
+        vehicle_type: authUser.vehicle_type || "bike", // שימוש ברמת התחבורה האמיתית
         is_available: authUser.isAvailable || false,
         rating: 4.8, // Default - should be calculated from deliveries
         created_at: authUser.createdAt || new Date().toISOString(),
@@ -56,6 +56,7 @@ export default function Dashboard() {
           delivery_address: "456 Oak Ave, Uptown",
           payment_amount: 15.50,
           status: "available",
+          required_vehicle_type: "bike", // משלוח לאופניים
           estimated_distance: "2.3 km",
           estimated_duration: "15 min",
           created_at: new Date().toISOString(),
@@ -71,8 +72,25 @@ export default function Dashboard() {
           delivery_address: "321 Pine Rd, Suburbs",
           payment_amount: 22.00,
           status: "available",
+          required_vehicle_type: "car", // משלוח לרכב
           estimated_distance: "4.1 km",
           estimated_duration: "25 min",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "3",
+          order_number: "ORD-003",
+          customer_name: "Lisa Brown",
+          customer_phone: "+1234567892",
+          package_description: "Large furniture delivery",
+          pickup_address: "555 Furniture St, Warehouse",
+          delivery_address: "777 Home Ave, Residential",
+          payment_amount: 45.00,
+          status: "available",
+          required_vehicle_type: "truck", // משלוח למשאית
+          estimated_distance: "8.5 km",
+          estimated_duration: "35 min",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -83,6 +101,19 @@ export default function Dashboard() {
       console.error("Error loading data:", error);
     }
     setIsLoading(false);
+  };
+
+  // סינון משלוחים לפי רמת התחבורה של השליח
+  const filteredDeliveries = deliveries.filter(delivery => {
+    if (!courier) return false;
+    return canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
+  });
+
+  const vehicleLabels = {
+    bike: 'אופניים',
+    motorcycle: 'אופנוע',
+    car: 'רכב',
+    truck: 'משאית'
   };
 
   const toggleAvailability = async () => {
@@ -131,45 +162,56 @@ export default function Dashboard() {
 
       <div className="mt-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Available Orders</h2>
-          {deliveries.length > 0 && (
+          <h2 className="text-xl font-bold text-gray-900 text-right">משלוחים זמינים</h2>
+          {filteredDeliveries.length > 0 && (
             <div className="flex items-center gap-1 text-sm text-blue-600 font-medium">
               <TrendingUp className="w-4 h-4" />
-              {deliveries.length} new
+              {filteredDeliveries.length} מתאימים לרכב שלך
             </div>
           )}
         </div>
 
-        {!courier?.is_available && deliveries.length > 0 && (
+        {/* הצגת מידע על סינון */}
+        {deliveries.length > filteredDeliveries.length && (
+          <Alert className="mb-4 border-blue-200 bg-blue-50">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              מוצגים {filteredDeliveries.length} מתוך {deliveries.length} משלוחים המתאימים ל{vehicleLabels[courier?.vehicle_type || 'bike']} שלך.
+              שדרג את סוג הרכב בפרופיל כדי לראות יותר משלוחים.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!courier?.is_available && filteredDeliveries.length > 0 && (
           <Alert className="mb-4 border-red-200 bg-red-50">
             <AlertCircle className="h-4 w-4 text-red-600" />
             <AlertDescription className="text-red-800">
-              You have {deliveries.length} available orders, but you need to go online to accept them
+              יש לך {filteredDeliveries.length} משלוחים מתאימים, אבל אתה צריך להיות זמין כדי לקבל אותם
             </AlertDescription>
           </Alert>
         )}
 
-        {!courier?.is_available && deliveries.length === 0 && (
+        {!courier?.is_available && filteredDeliveries.length === 0 && (
           <Alert className="mb-4 border-amber-200 bg-amber-50">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
-              Go online to start receiving delivery orders
+              עבור למצב זמין כדי להתחיל לקבל משלוחים
             </AlertDescription>
           </Alert>
         )}
 
-        {courier?.is_available && deliveries.length === 0 && (
+        {courier?.is_available && filteredDeliveries.length === 0 && (
           <div className="text-center py-12">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <PackageIcon className="w-10 h-10 text-gray-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders available</h3>
-            <p className="text-gray-500">New orders will appear here automatically</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 text-right">אין משלוחים מתאימים זמינים</h3>
+            <p className="text-gray-500 text-right">משלוחים חדשים המתאימים לרכב שלך יופיעו כאן אוטומטית</p>
           </div>
         )}
 
         <div className="space-y-3">
-          {deliveries.map((delivery) => (
+          {filteredDeliveries.map((delivery) => (
             <JobCard
               key={delivery.id}
               delivery={delivery}
