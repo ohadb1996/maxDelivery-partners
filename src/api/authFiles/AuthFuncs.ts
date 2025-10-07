@@ -396,17 +396,21 @@ export const checkUserExistsInAuth = async (email: string): Promise<boolean> => 
  */
 export const updateCourierAvailability = async (userId: string, isAvailable: boolean): Promise<void> => {
   try {
-    console.log('[AuthFuncs] Updating courier availability:', { userId, isAvailable });
+    console.log('[AuthFuncs] Starting updateCourierAvailability:', { userId, isAvailable });
+    console.log('[AuthFuncs] Database instance:', !!db);
     
     const updates = {
       [`Users/${userId}/isAvailable`]: isAvailable,
       [`Users/${userId}/lastStatusUpdate`]: new Date().toISOString(),
     };
     
+    console.log('[AuthFuncs] Updates object:', updates);
+    
     await update(ref(db), updates);
     console.log('[AuthFuncs] Courier availability updated successfully');
   } catch (error) {
     console.error('[AuthFuncs] Error updating courier availability:', error);
+    console.error('[AuthFuncs] Error details:', error);
     throw error;
   }
 };

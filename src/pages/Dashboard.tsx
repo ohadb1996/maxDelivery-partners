@@ -7,7 +7,7 @@ import { Delivery, Courier, User, VehicleType, canVehicleTakeDelivery } from "@/
 import { useAuth } from "@/context/AuthContext";
 
 import MapView from "@/components/courier/MapView";
-import DragToggle from "@/components/courier/DragToggle";
+import SimpleToggle from "@/components/courier/SimpleToggle";
 import JobCard from "@/components/courier/JobCard";
 
 export default function Dashboard() {
@@ -241,8 +241,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Drag Toggle - Bottom Fixed */}
-      <DragToggle
+      {/* Simple Toggle - Bottom Fixed */}
+      <SimpleToggle
         isAvailable={courier?.is_available || false}
         onToggle={toggleAvailability}
         isLoading={isToggling}

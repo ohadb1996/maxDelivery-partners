@@ -114,7 +114,7 @@ export default function Layout({ children }: LayoutProps) {
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                <span>התנתקות</span>
+             
               </button>
             </div>
           </div>
