@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Package, History, User as UserIcon, LogOut } from "lucide-react";
+import { Home, Package, History, User as UserIcon, LogOut, Menu } from "lucide-react";
 import { User, Courier } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import SideNavigation from "./SideNavigation";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { user: authUser, logout, isLoading } = useAuth();
   const [courier, setCourier] = useState<Courier | null>(null);
+  const [isSideNavOpen, setIsSideNavOpen] = useState(false);
 
   useEffect(() => {
     if (authUser) {
@@ -77,31 +79,36 @@ export default function Layout({ children }: LayoutProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSideNavOpen(true)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Menu className="w-6 h-6 text-gray-600" />
+              </button>
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
                 <Package className="w-6 h-6 text-white" />
               </div>
-              <div className="text-right">
-                <h1 className="text-lg font-bold text-gray-900">MaxDelivery שותף</h1>
+              <div className="text-left">
+                <h1 className="text-lg font-bold text-gray-900">MaxDelivery partner</h1>
                 {authUser && (
                   <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>
-                )}
+                  
+              )}
+                 {authUser && (
+          
+                  <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
+          
+              )}
               </div>
             </div>
             <div className="flex items-center gap-4">
-              {authUser && (
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
-                  <span className={`text-xs font-medium ${authUser.isAvailable ? 'text-green-600' : 'text-gray-500'}`}>
-                    {authUser.isAvailable ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-              )}
+             
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -119,34 +126,11 @@ export default function Layout({ children }: LayoutProps) {
         {children}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom">
-        <div className="grid grid-cols-4 px-2">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex flex-col items-center justify-center py-2 px-1 transition-colors ${
-                  isActive
-                    ? "text-blue-600"
-                    : "text-gray-500"
-                }`}
-              >
-                <Icon className={`w-6 h-6 mb-1 ${isActive ? 'scale-110' : ''} transition-transform`} />
-                <span className={`text-xs ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                  {item.name}
-                </span>
-                {isActive && (
-                  <div className="absolute bottom-0 w-12 h-1 bg-blue-600 rounded-t-full" />
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {/* Side Navigation */}
+      <SideNavigation 
+        isOpen={isSideNavOpen} 
+        onToggle={() => setIsSideNavOpen(!isSideNavOpen)} 
+      />
     </div>
   );
 }
