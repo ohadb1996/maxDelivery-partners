@@ -1,47 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Package, History, User as UserIcon, LogOut, Menu } from "lucide-react";
-import { User, Courier } from "@/types";
+import { useNavigate } from "react-router-dom";
+import { LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import SideNavigation from "./SideNavigation";
+import { Logo } from "../ui/Logo";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const location = useLocation();
   const navigate = useNavigate();
   const { user: authUser, logout, isLoading } = useAuth();
-  const [courier, setCourier] = useState<Courier | null>(null);
   const [isSideNavOpen, setIsSideNavOpen] = useState(false);
-
-  useEffect(() => {
-    if (authUser) {
-      loadCourierData();
-    }
-  }, [authUser]);
-
-  const loadCourierData = async () => {
-    try {
-      // Mock data for now - replace with actual API calls
-      // This should be replaced with real courier data from the database
-      const mockCourier: Courier = {
-        id: authUser?.uid || "1",
-        created_by: authUser?.email || "courier@example.com",
-        phone: authUser?.phone || "+1234567890",
-        vehicle_type: "bike",
-        is_available: true,
-        rating: 4.8,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      setCourier(mockCourier);
-    } catch (error) {
-      console.error("Error loading courier data:", error);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -71,13 +42,6 @@ export default function Layout({ children }: LayoutProps) {
     );
   }
 
-  const navItems = [
-    { name: "דשבורד", path: "/", icon: Home },
-    { name: "פעיל", path: "/active", icon: Package },
-    { name: "היסטוריה", path: "/history", icon: History },
-    { name: "פרופיל", path: "/profile", icon: UserIcon },
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -91,16 +55,14 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Menu className="w-6 h-6 text-gray-600" />
               </button>
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-white" />
-              </div>
+              <Logo size="md" showText={false} />
               <div className="text-left">
                 <h1 className="text-lg font-bold text-gray-900">MaxDelivery partner</h1>
                 {authUser && (
                   <div className="flex items-center gap-2">
-                  <p className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
-                  <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>                 
-                </div> 
+                    <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-red-400'} animate-pulse`} />
+                    <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>
+                  </div> 
               )}
                 
               </div>

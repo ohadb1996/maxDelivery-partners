@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { User2, Phone, Star, Package, TrendingUp, Bike, Car, Truck, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { VehicleType, VEHICLE_HIERARCHY } from "@/types";
+import { VehicleType } from "@/types";
 
 export default function Profile() {
   const { user, updateVehicleType } = useAuth();

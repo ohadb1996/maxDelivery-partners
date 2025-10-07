@@ -6,6 +6,7 @@ import { AuthCard } from "../components/auth/AuthCard";
 import { AuthInput } from "../components/auth/AuthInput";
 import { AuthSubmitButton } from "../components/auth/AuthSubmitButton";
 import { AuthLink } from "../components/auth/AuthLink";
+import { Logo } from "../components/ui/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -341,7 +342,12 @@ export default function RegistrationPage() {
  return (
     <AuthLayout>
       <AuthCard>
-        <h3 className="text-2xl font-bold mb-6 text-center">הרשמה</h3>
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <Logo size="xl" showText={true} className="text-white" />
+        </div>
+        
+        <h3 className="text-2xl font-bold mb-6 text-center text-white">הרשמה</h3>
 
         {registrationError && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">

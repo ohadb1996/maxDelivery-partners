@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navigation, Phone, MapPin, Package, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { Delivery, User } from "@/types";
+import { Delivery } from "@/types";
 
 import StatusTimeline from "@/components/courier/StatusTimeline";
 
@@ -33,6 +33,9 @@ export default function ActiveJob() {
         delivery_address: "456 Oak Ave, Uptown",
         payment_amount: 15.50,
         status: "accepted",
+        required_vehicle_type: "bike",
+        estimated_distance: "2.3 km",
+        estimated_duration: "15 min",
         accepted_time: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

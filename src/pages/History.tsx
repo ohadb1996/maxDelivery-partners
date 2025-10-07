@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock, DollarSign, CheckCircle } from "lucide-react";
-import { Delivery, User } from "@/types";
+import { Delivery } from "@/types";
 
 export default function History() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -27,6 +27,9 @@ export default function History() {
           delivery_address: "456 Oak Ave, Uptown",
           payment_amount: 15.50,
           status: "delivered",
+          required_vehicle_type: "bike",
+          estimated_distance: "2.3 km",
+          estimated_duration: "15 min",
           accepted_time: new Date(Date.now() - 86400000).toISOString(),
           pickup_time: new Date(Date.now() - 86300000).toISOString(),
           delivery_time: new Date(Date.now() - 86200000).toISOString(),
@@ -43,6 +46,9 @@ export default function History() {
           delivery_address: "321 Pine Rd, Suburbs",
           payment_amount: 22.00,
           status: "delivered",
+          required_vehicle_type: "car",
+          estimated_distance: "4.1 km",
+          estimated_duration: "25 min",
           accepted_time: new Date(Date.now() - 172800000).toISOString(),
           pickup_time: new Date(Date.now() - 172700000).toISOString(),
           delivery_time: new Date(Date.now() - 172600000).toISOString(),

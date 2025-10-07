@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, TrendingUp, Package as PackageIcon } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Delivery, Courier, User, VehicleType, canVehicleTakeDelivery } from "@/types";
+import { Delivery, Courier, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 import MapView from "@/components/courier/MapView";
 import SimpleToggle from "@/components/courier/SimpleToggle";
-import JobCard from "@/components/courier/JobCard";
+import DraggableJobCards from "@/components/courier/DraggableJobCards";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -122,12 +119,6 @@ export default function Dashboard() {
     return canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
   });
 
-  const vehicleLabels = {
-    bike: 'אופניים',
-    motorcycle: 'אופנוע',
-    car: 'רכב',
-    truck: 'משאית'
-  };
 
   const toggleAvailability = async () => {
     console.log('Dashboard: toggleAvailability called, current availability:', courier?.is_available);
@@ -189,57 +180,13 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Scrollable Content Section */}
-      <div className="bg-white rounded-t-3xl shadow-2xl flex-shrink-0 max-h-96 overflow-hidden">
-        {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
-        </div>
-        
-        <div className="px-4 pb-20 overflow-y-auto max-h-80">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 text-right">משלוחים זמינים</h2>
-            {filteredDeliveries.length > 0 && (
-              <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
-                <TrendingUp className="w-4 h-4" />
-                {filteredDeliveries.length} מתאימים
-              </div>
-            )}
-          </div>
-
-          {/* Status Messages */}
-          {!courier?.is_available && filteredDeliveries.length > 0 && (
-            <Alert className="mb-4 border-orange-200 bg-orange-50">
-              <AlertCircle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800 text-sm">
-                יש {filteredDeliveries.length} משלוחים מתאימים - גרור את הכפתור למטה כדי להתחיל לקבל משלוחים
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {courier?.is_available && filteredDeliveries.length === 0 && (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <PackageIcon className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 text-right">אין משלוחים זמינים</h3>
-              <p className="text-gray-500 text-right text-sm">משלוחים חדשים יופיעו כאן אוטומטית</p>
-            </div>
-          )}
-
-          {/* Delivery Cards */}
-          <div className="space-y-3">
-            {filteredDeliveries.map((delivery) => (
-              <JobCard
-                key={delivery.id}
-                delivery={delivery}
-                onClick={() => handleJobClick(delivery)}
-                onAccept={() => handleAcceptJob(delivery)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Draggable Job Cards */}
+      <DraggableJobCards
+        deliveries={filteredDeliveries}
+        isAvailable={courier?.is_available || false}
+        onJobClick={handleJobClick}
+        onAcceptJob={handleAcceptJob}
+      />
 
       {/* Simple Toggle - Bottom Fixed */}
       <SimpleToggle

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -114,7 +114,7 @@ export default function MapView({ deliveries, isAvailable, onDeliveryClick }: Ma
           const coords = deliveryCoordinates[delivery.id];
           if (!coords) return null;
 
-          const iconColor = delivery.payment_amount > 30 ? '#10b981' : delivery.payment_amount > 20 ? '#f59e0b' : '#3b82f6';
+          const iconColor = (delivery.payment_amount || 0) > 30 ? '#10b981' : (delivery.payment_amount || 0) > 20 ? '#f59e0b' : '#3b82f6';
 
           return (
             <Marker key={delivery.id} position={coords} icon={createCustomIcon(iconColor)}>

@@ -5,9 +5,10 @@ import { AuthCard } from '../components/auth/AuthCard';
 import { AuthInput } from '../components/auth/AuthInput';
 import { AuthSubmitButton } from '../components/auth/AuthSubmitButton';
 import { AuthLink } from '../components/auth/AuthLink';
+import { Logo } from '../components/ui/Logo';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { createTestUser, checkUserExistsInAuth, sendPasswordResetEmail } from '../api/authFiles/AuthFuncs';
+import { checkUserExistsInAuth, sendPasswordResetEmail } from '../api/authFiles/AuthFuncs';
 
 export default function LoginPage() {
   const { login, isAuthInProgress, user, isLoading, clearAuthInProgress } = useAuth();
@@ -101,15 +102,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleCreateTestUser = async () => {
-    try {
-      setLoginError('');
-      await createTestUser();
-      setLoginError('משתמש בדיקה נוצר בהצלחה! התחבר עם test@example.com / test123456');
-    } catch (error: any) {
-      setLoginError('שגיאה ביצירת משתמש בדיקה: ' + error.message);
-    }
-  };
 
   const handlePasswordReset = async () => {
     if (!formData.email.trim()) {
@@ -159,7 +151,12 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <AuthCard>
-        <h3 className="text-2xl font-bold mb-6 text-center">התחברות</h3>
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <Logo size="xl" showText={true} className="text-white" />
+        </div>
+        
+        <h3 className="text-2xl font-bold mb-6 text-center text-white">התחברות</h3>
         
         {isLoading && (
           <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3 text-blue-400">

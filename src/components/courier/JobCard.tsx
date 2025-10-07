@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, DollarSign, Navigation2, AlertCircle, Bike, Car, Truck } from "lucide-react";
 import { motion } from "framer-motion";
-import { Delivery, VehicleType } from "@/types";
+import { Delivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 interface JobCardProps {

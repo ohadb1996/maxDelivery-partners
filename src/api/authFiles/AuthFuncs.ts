@@ -222,10 +222,12 @@ export const checkAdminStatus = async (userId: string): Promise<boolean> => {
 
 // יצירת משתמש בדיקה לפיתוח
 export const createTestUser = async (): Promise<User> => {
-  const testUserData = {
+  const testUserData: SignUpParams = {
     email: "test@example.com",
     password: "test123456",
     username: "testuser",
+    firstName: "Test",
+    lastName: "User",
     phone: "+972501234567",
     country: "IL" as CountryCode
   };
@@ -568,7 +570,7 @@ export const verifyPasswordResetCode = async (actionCode: string): Promise<void>
 };
 
 // פונקציה לאישור איפוס סיסמא
-export const confirmPasswordReset = async (actionCode: string, newPassword: string): Promise<void> => {
+export const confirmPasswordReset = async (_actionCode: string, _newPassword: string): Promise<void> => {
   try {
     // אימות הקוד
     // Note: This would require additional imports from Firebase Auth

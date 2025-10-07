@@ -1,6 +1,6 @@
-import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Package, History, User as UserIcon, Menu, X } from "lucide-react";
+import { Home, Package, History, User as UserIcon, X } from "lucide-react";
+import { Logo } from "../ui/Logo";
 
 interface SideNavigationProps {
   isOpen: boolean;
@@ -35,11 +35,9 @@ export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-white" />
-              </div>
+              <Logo size="md" showText={false} />
               <div>
-                <h1 className="text-lg font-bold text-gray-900">MaxDelivery שותף</h1>
+                <h1 className="text-lg font-bold text-gray-900">MaxDelivery</h1>
                 <p className="text-xs text-gray-500">תפריט ניווט</p>
               </div>
             </div>
@@ -68,10 +66,7 @@ export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps
                   }`}
                 >
                   <div className={`relative ${isActive ? 'animate-pulse' : ''}`}>
-                    <Icon className={`w-6 h-6 transition-all ${isActive ? 'scale-110 drop-shadow-lg' : ''}`} />
-                    {isActive && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping" />
-                    )}
+                    <Icon className={`w-6 h-6 transition-all ${isActive ? 'scale-110 drop-shadow-lg' : ''}`} />  
                   </div>
                   <span className={`text-lg font-medium ${isActive ? 'font-bold' : ''}`}>
                     {item.name}

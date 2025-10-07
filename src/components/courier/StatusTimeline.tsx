@@ -1,5 +1,4 @@
-import React from "react";
-import { CheckCircle, Clock, MapPin, Package } from "lucide-react";
+import { CheckCircle, MapPin, Package } from "lucide-react";
 
 interface StatusTimelineProps {
   currentStatus: string;

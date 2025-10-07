@@ -1,4 +1,3 @@
-import React from "react";
 import { Power, PowerOff } from "lucide-react";
 
 interface SimpleToggleProps {
