@@ -97,14 +97,12 @@ export default function Layout({ children }: LayoutProps) {
               <div className="text-left">
                 <h1 className="text-lg font-bold text-gray-900">MaxDelivery partner</h1>
                 {authUser && (
-                  <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>
-                  
+                  <div className="flex items-center gap-2">
+                  <p className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
+                  <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>                 
+                </div> 
               )}
-                 {authUser && (
-          
-                  <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
-          
-              )}
+                
               </div>
             </div>
             <div className="flex items-center gap-4">
