@@ -36,11 +36,11 @@ export function AuthSubmitButton({
       type={type}
       disabled={isDisabled}
       onClick={handleClick}
-      className="relative w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-medium transition-all duration-500 text-white overflow-hidden group hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+      className="relative w-full py-3 bg-gradient-to-r from-black to-green-800 rounded-xl font-medium transition-all duration-500 text-white overflow-hidden group hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       {...props}
     >
       {/* Hover gradient */}
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-900 to-green-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       
       {/* Shimmer effect */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100">

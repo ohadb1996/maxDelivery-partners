@@ -159,14 +159,14 @@ export default function LoginPage() {
         <h3 className="text-2xl font-bold mb-6 text-center text-white">התחברות</h3>
         
         {isLoading && (
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3 text-blue-400">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
+          <div className="mb-6 p-4 bg-blue-500/20 border border-blue-400/30 rounded-xl flex items-center gap-3 text-blue-300">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-300"></div>
             <p>בודק אם יש התחברות קיימת...</p>
           </div>
         )}
 
         {loginError && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
+          <div className="mb-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl flex items-center gap-3 text-red-300">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
             <p>{loginError}</p>
           </div>
@@ -208,11 +208,11 @@ export default function LoginPage() {
               type="button"
               onClick={handlePasswordReset}
               disabled={isPasswordResetLoading || !formData.email.trim()}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+              className="text-sm text-blue-300 hover:text-blue-200 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
             >
               {isPasswordResetLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"></div>
                 שולח מייל לאיפוס סיסמא...
                 </span>
               ) : (
@@ -226,7 +226,7 @@ export default function LoginPage() {
 
           {/* הודעת אישור שליחת מייל לאיפוס סיסמה */}
           {isPasswordResetSent && (
-            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-center gap-3 text-green-400">
+            <div className="p-4 bg-green-500/20 border border-green-400/30 rounded-xl flex items-center gap-3 text-green-300">
               <Mail className="h-5 w-5 flex-shrink-0" />
               <p>נשלח מייל לאיפוס סיסמה לכתובת {formData.email}</p>
             </div>
@@ -241,16 +241,6 @@ export default function LoginPage() {
           </AuthSubmitButton>
         </form>
 
-        <div className="mt-4 text-center">
-          <button
-            type="button"
-            onClick={handlePasswordReset}
-            disabled={isPasswordResetLoading || isAuthInProgress || isLoginLoading || isLoading}
-            className="text-blue-400 hover:text-blue-300 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isPasswordResetLoading ? 'שולח מייל...' : 'שכחת סיסמה?'}
-          </button>
-        </div>
 
         <div className="mt-4 text-center">
           <AuthLink to="/register">

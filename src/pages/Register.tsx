@@ -41,29 +41,8 @@ export default function RegistrationPage() {
   const [showCountryList, setShowCountryList] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
-  // איפוס isNavigating כשהניווט מסתיים
-  useEffect(() => {
-    const handleRouteChangeStart = () => {
-      // הניווט התחיל
-    };
-    
-    const handleRouteChangeComplete = () => {
-      // הניווט הסתיים
-      setIsNavigating(false);
-    };
-    
-    const handleRouteChangeError = () => {
-      // הניווט נכשל
-      setIsNavigating(false);
-    };
-
-    // Note: In React Router, we don't have router events like Next.js
-    // We'll handle navigation state differently
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, [navigate]);
+  // Note: In React Router, we don't have router events like Next.js
+  // We'll handle navigation state differently
 
   // בדיקת וולידציה על כל שינוי
   useEffect(() => {
@@ -163,7 +142,7 @@ export default function RegistrationPage() {
     // בדוק כל 500ms כדי לא לעשות יותר מדי קריאות
     const timeoutId = setTimeout(validateAllFields, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.email, formData.username, formData.phone, formData.password, formData.country]);
+  }, [formData.email, formData.firstName, formData.lastName, formData.phone, formData.password, formData.country]);
 
   // סגירת התפריט בלחיצה מחוץ לו
   useEffect(() => {
@@ -350,7 +329,7 @@ export default function RegistrationPage() {
         <h3 className="text-2xl font-bold mb-6 text-center text-white">הרשמה</h3>
 
         {registrationError && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400">
+          <div className="mb-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl flex items-center gap-3 text-red-300">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
             <p>{registrationError}</p>
           </div>
@@ -390,11 +369,11 @@ export default function RegistrationPage() {
           />
 
           <div className="space-y-2">
-        <label className="block text-sm mb-2">מספר טלפון</label>
+        <label className="block text-sm mb-2 text-white font-medium">מספר טלפון</label>
         <div className="relative country-selector">
-          <div className="flex items-center w-full bg-white/5 border rounded-xl focus-within:ring-2 transition-all focus-within:border-blue-500 focus-within:ring-blue-500/20 overflow-hidden">
+          <div className="flex items-center w-full bg-white/10 border border-white/30 rounded-xl focus-within:ring-2 transition-all focus-within:border-blue-400 focus-within:ring-blue-400/20 overflow-hidden">
             {/* אייקון טלפון (שמאל) */}
-            <div className="px-3 text-gray-400 flex-shrink-0">
+            <div className="px-3 text-gray-300 flex-shrink-0">
               <Phone className="h-5 w-5" />
             </div>
             
@@ -419,7 +398,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={() => setShowCountryList(!showCountryList)}
-                className="h-full px-4 py-3 border-l border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-200 flex items-center gap-2 min-w-[120px] group"
+                className="h-full px-4 py-3 border-l border-white/30 bg-white/10 hover:bg-white/20 transition-all duration-200 flex items-center gap-2 min-w-[120px] group"
               >
                 <span className="text-lg">
                   {countryData[formData.country]?.flag}
@@ -427,13 +406,13 @@ export default function RegistrationPage() {
                 <span className="text-sm font-medium text-white">
                   {countryData[formData.country]?.prefix}
                 </span>
-                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
+                <ChevronDown className={`h-4 w-4 text-gray-300 transition-transform duration-200 ${
                   showCountryList ? 'rotate-180' : ''
                 }`} />
               </button>
               
               {showCountryList && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-[#0a1122]/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden z-50 shadow-2xl">
+                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600 overflow-hidden z-50 shadow-2xl">
                   <div className="max-h-72 overflow-y-auto">
                     {Object.entries(countryData).map(([code, data]) => (
                       <button
@@ -443,7 +422,7 @@ export default function RegistrationPage() {
                           setFormData({...formData, country: code as CountryCode});
                           setShowCountryList(false);
                         }}
-                        className="w-full px-4 py-3 text-right hover:bg-white/10 flex items-center gap-3 transition-all duration-200"
+                        className="w-full px-4 py-3 text-right hover:bg-gray-700 flex items-center gap-3 transition-all duration-200"
                       >
                         <span className="text-xl">{data.flag}</span>
                         <div className="flex-1 text-left">
@@ -465,7 +444,7 @@ export default function RegistrationPage() {
           </div>
         </div>
         {errors.phone && (
-          <p className="mt-1 text-sm text-red-400">{errors.phone}</p>
+          <p className="mt-1 text-sm text-red-300">{errors.phone}</p>
         )}
         
       </div>

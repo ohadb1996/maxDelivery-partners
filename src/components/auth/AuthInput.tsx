@@ -26,24 +26,24 @@ export function AuthInput({
 
   return (
     <div>
-      <label className="block text-sm mb-2">{label}</label>
+      <label className="block text-sm mb-2 text-white font-medium">{label}</label>
       <div className="relative">
         <input
           type={type === 'password' ? (showPassword ? 'text' : 'password') : type}
           value={value}
           onChange={onChange}
           className={`
-            w-full px-4 py-3 bg-white/5 border rounded-xl focus:ring-2 transition-all text-white
+            w-full px-4 py-3 bg-white/10 border rounded-xl focus:ring-2 transition-all text-white placeholder-gray-300
             ${error 
-              ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-              : 'border-white/10 focus:border-blue-500 focus:ring-blue-500/20'
+              ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' 
+              : 'border-white/30 focus:border-blue-400 focus:ring-blue-400/20'
             }
             ${type === 'password' ? 'pl-20' : 'pl-10'}
           `}
           placeholder={placeholder}
           dir={dir}
         />
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300">
           {icon}
         </div>
 
@@ -54,15 +54,15 @@ export function AuthInput({
             className="absolute left-10 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-lg transition-colors"
           >
             {showPassword ? (
-              <EyeOff className="h-4 w-4 text-gray-400" />
+              <EyeOff className="h-4 w-4 text-gray-300" />
             ) : (
-              <Eye className="h-4 w-4 text-gray-400" />
+              <Eye className="h-4 w-4 text-gray-300" />
             )}
           </button>
         )}
       </div>
       {error && (
-        <p className="mt-1 text-sm text-red-400">{error}</p>
+        <p className="mt-1 text-sm text-red-300">{error}</p>
       )}
     </div>
   );

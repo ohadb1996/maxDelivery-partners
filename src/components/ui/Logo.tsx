@@ -1,4 +1,3 @@
-import React from 'react';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -35,10 +34,10 @@ export function Logo({ size = 'md', showText = true, className = '' }: LogoProps
       {/* Logo Text */}
       {showText && (
         <div className="text-left">
-          <h1 className={`${textSizeClasses[size]} font-bold text-gray-900`}>
+          <h1 className={`${textSizeClasses[size]} font-bold text-white`}>
             MaxDelivery
           </h1>
-          <p className="text-xs text-gray-500">Partner App</p>
+          <p className="text-xs text-white">Partner App</p>
         </div>
       )}
     </div>

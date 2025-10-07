@@ -11,7 +11,7 @@ export function AuthLink({ to, children }: AuthLinkProps) {
     <div className="mt-6 text-center">
       <Link 
         to={to}
-        className="relative text-gray-400 hover:text-white transition-all duration-300 group"
+        className="relative text-gray-300 hover:text-white transition-all duration-300 group"
       >
         {/* Hover underline effect */}
         <span className="relative">

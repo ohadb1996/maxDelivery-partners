@@ -121,7 +121,7 @@ export default function DraggableJobCards({
     return baseHeight - dragOffset;
   };
 
-  const filteredDeliveries = deliveries.filter(delivery => 
+  const filteredDeliveries = deliveries.filter(() => 
     isAvailable || !isAvailable // Show all deliveries regardless of availability
   );
 
