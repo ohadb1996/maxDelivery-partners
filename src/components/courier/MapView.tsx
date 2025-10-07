@@ -142,19 +142,7 @@ export default function MapView({ deliveries, isAvailable, onDeliveryClick }: Ma
         })}
       </MapContainer>
       
-      {/* Map controls overlay */}
-      <div className="absolute top-4 right-4 z-10">
-        {isAvailable && deliveries.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold text-gray-900">
-                {deliveries.length} משלוחים זמינים
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
+      
     </div>
   );
 }
