@@ -125,6 +125,21 @@ export default function DraggableJobCards({
     isAvailable || !isAvailable // Show all deliveries regardless of availability
   );
 
+  // Debug logs
+  useEffect(() => {
+    console.log('📋 [DraggableJobCards] Props changed:', {
+      deliveries_count: deliveries.length,
+      filtered_count: filteredDeliveries.length,
+      isAvailable,
+      deliveries: deliveries.map(d => ({
+        id: d.id,
+        customer: d.customer_name,
+        status: d.status,
+        vehicle: d.required_vehicle_type
+      }))
+    });
+  }, [deliveries, filteredDeliveries, isAvailable]);
+
   return (
     <div 
       ref={containerRef}

@@ -118,16 +118,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const db = getDatabase(app);
       //console.log('[AuthContext] Database instance created:', !!db);
       
-      const userRef = ref(db, `Users/${firebaseUser.uid}`);
-      //console.log('[AuthContext] User ref created for path:', `Users/${firebaseUser.uid}`);
-      
+      const userRef = ref(db, `Couriers/${firebaseUser.uid}`);
+  
       //console.log('[AuthContext] About to fetch user data...');
       const snapshot = await get(userRef);
       //console.log('[AuthContext] Snapshot received:', snapshot.exists() ? 'exists' : 'not exists');
       
       if (snapshot.exists()) {
         const userData = snapshot.val();
-        console.log('[AuthContext] User data loaded:', userData);
+        console.log('[AuthContext] ✅ Courier data found:', userData);
         
         // טעינת רמת התחבורה
         let vehicleType: VehicleType = 'bike'; // ברירת מחדל
@@ -154,7 +153,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('[AuthContext] Setting user with username:', authUser.username, 'vehicle_type:', authUser.vehicle_type);
         setUser(authUser);
       } else {
-        console.log('[AuthContext] No user data found in database');
+        // 🚨 פרצת אבטחה: משתמש לא קיים ב-Couriers!
+        console.error('🚨 [AuthContext] SECURITY: User not found in Couriers database!');
+        console.error('🚨 [AuthContext] This user may be a Business user trying to access the Courier app');
+        console.error('🚨 [AuthContext] Logging out and blocking access...');
         
         // אם זה משתמש חדש ואין עדיין נתונים, נסה שוב אחרי עיכוב
         if (retryCount < 3) {
@@ -165,8 +167,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
         
-        // אחרי 3 נסיונות, נסה ליצור נתונים בסיסיים
-        console.log('[AuthContext] Creating basic user data for existing Firebase user');
+        // אחרי 3 נסיונות - חסום גישה!
+        console.error('🚨 [AuthContext] BLOCKING ACCESS: User does not exist in Couriers database');
+        alert('שגיאת הרשאות: חשבון זה לא רשום כשליח.\n\nאנא השתמש באפליקציית בעלי העסקים או הירשם מחדש כשליח.');
+        
+        // התנתק מיד
+        const auth = getAuth(app);
+        await auth.signOut();
+        setUser(null);
+        return;
+        
+        // 🚫 הקוד הישן הוסר - לא יוצרים נתונים אוטומטית!
+        console.log('[AuthContext] OLD CODE - Creating basic user data for existing Firebase user');
         try {
               const basicUserData = {
                 username: firebaseUser.email?.split('@')[0] || 'user',

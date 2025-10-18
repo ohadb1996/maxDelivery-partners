@@ -1,6 +1,6 @@
 {
   "rules": {
-    "Users": {
+    "Couriers": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid",
@@ -16,12 +16,6 @@
           ".read": "auth != null",
           ".write": "auth != null && auth.uid == $uid"
         }
-      }
-    },
-    "Couriers": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
       }
     },
     "Deliveries": {

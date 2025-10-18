@@ -8,6 +8,7 @@ import { MapPin, Clock, Navigation, Phone, Package, CheckCircle, AlertCircle, Bi
 import { motion } from "framer-motion";
 import { Delivery, VehicleType, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { getDeliveryById, assignDeliveryToCourier } from "@/services/deliveryService";
 
 export default function JobDetails() {
   const { id } = useParams<{ id: string }>();
@@ -18,7 +19,7 @@ export default function JobDetails() {
   const [isAccepting, setIsAccepting] = useState(false);
 
   const isAvailable = user?.isAvailable || false;
-  const courierVehicleType: VehicleType = user?.vehicle_type || 'bike'; // שימוש ברמת התחבורה האמיתית
+  const courierVehicleType: VehicleType = user?.vehicle_type || 'motorcycle'; // ברירת מחדל: קטנוע (יכול לקחת גם משלוחי אופניים)
   const canTakeThisDelivery = delivery ? canVehicleTakeDelivery(courierVehicleType, delivery.required_vehicle_type) : false;
 
   useEffect(() => {
@@ -28,28 +29,25 @@ export default function JobDetails() {
   const loadJobDetails = async () => {
     setIsLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockDelivery: Delivery = {
-        id: id || "1",
-        order_number: "ORD-001",
-        customer_name: "Sarah Johnson",
-        customer_phone: "+1234567890",
-        package_description: "Food delivery from Pizza Palace",
-        pickup_address: "123 Main St, Downtown",
-        delivery_address: "456 Oak Ave, Uptown",
-        payment_amount: 15.50,
-        status: "available",
-        required_vehicle_type: "car", // דוגמה - משלוח שדורש רכב
-        estimated_distance: "2.3 km",
-        estimated_duration: "15 min",
-        delivery_notes: "Please ring the doorbell twice",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+      if (!id) {
+        console.error('❌ [JobDetails] No delivery ID provided');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log(`📦 [JobDetails] Loading delivery ${id}`);
+      const deliveryData = await getDeliveryById(id);
       
-      setDelivery(mockDelivery);
+      if (deliveryData) {
+        console.log(`✅ [JobDetails] Loaded delivery:`, deliveryData);
+        setDelivery(deliveryData);
+      } else {
+        console.error(`❌ [JobDetails] Delivery ${id} not found`);
+        setDelivery(null);
+      }
     } catch (error) {
-      console.error("Error loading job details:", error);
+      console.error("❌ [JobDetails] Error loading job details:", error);
+      setDelivery(null);
     }
     setIsLoading(false);
   };
@@ -70,27 +68,39 @@ export default function JobDetails() {
 
   const acceptJob = async () => {
     if (!isAvailable) {
-      console.log('Cannot accept job - user is offline');
+      console.log('❌ [JobDetails] Cannot accept job - user is offline');
       return;
     }
 
     if (!canTakeThisDelivery) {
-      console.log('Cannot accept job - vehicle type not suitable');
+      console.log('❌ [JobDetails] Cannot accept job - vehicle type not suitable');
+      return;
+    }
+
+    if (!user || !delivery) {
+      console.error('❌ [JobDetails] Cannot accept job - no user or delivery');
       return;
     }
     
     setIsAccepting(true);
     try {
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('📝 [JobDetails] Accepting job:', delivery.id);
       
-      if (delivery) {
+      const success = await assignDeliveryToCourier(delivery.id, user.uid);
+      
+      if (success) {
+        console.log('✅ [JobDetails] Job accepted successfully');
+        // עדכן את הסטטוס המקומי
         setDelivery({ ...delivery, status: "accepted", accepted_time: new Date().toISOString() });
-        // Navigate to active job page
-        navigate("/active");
+        // נווט לדף המשלוח הפעיל
+        navigate('/active');
+      } else {
+        console.error('❌ [JobDetails] Failed to accept job');
+        // TODO: Show error message to user
       }
     } catch (error) {
-      console.error("Error accepting job:", error);
+      console.error('❌ [JobDetails] Error accepting job:', error);
+      // TODO: Show error message to user
     }
     setIsAccepting(false);
   };

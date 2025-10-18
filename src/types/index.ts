@@ -24,7 +24,7 @@ export const canVehicleTakeDelivery = (courierVehicle: VehicleType, requiredVehi
 
 export interface Courier {
   id: string;
-  created_by: string;
+  business_email: string;
   phone: string;
   vehicle_type: VehicleType;
   is_available: boolean;

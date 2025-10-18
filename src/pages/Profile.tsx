@@ -5,6 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { User2, Phone, Star, Package, TrendingUp, Bike, Car, Truck, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { VehicleType } from "@/types";
+import { 
+  getCurrentMonthStats, 
+  getDailyStatsForMonth,
+  getMonthlyStats
+} from "@/services/deliveryService";
+import MonthlyDeliveriesChart from "@/components/courier/MonthlyDeliveriesChart";
+import MonthSelector from "@/components/courier/MonthSelector";
+import MonthlyStatsCard from "@/components/courier/MonthlyStatsCard";
 
 export default function Profile() {
   const { user, updateVehicleType } = useAuth();
@@ -13,10 +21,24 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingVehicle, setIsEditingVehicle] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('bike');
+  
+  // מצבים לגרפים
+  const [currentMonthData, setCurrentMonthData] = useState<any>(null);
+  const [currentMonthStats, setCurrentMonthStats] = useState<any>(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedMonthData, setSelectedMonthData] = useState<any>(null);
+  const [selectedMonthStats, setSelectedMonthStats] = useState<any>(null);
 
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    if (user?.uid) {
+      loadMonthlyData();
+    }
+  }, [user, selectedYear, selectedMonth]);
 
   const loadProfile = async () => {
     try {
@@ -29,7 +51,7 @@ export default function Profile() {
       // שימוש בנתונים אמיתיים מהמשתמש
       const courierData = {
         id: user.uid,
-        created_by: user.email,
+        business_email: user.email,
         phone: user.phone || "",
         vehicle_type: user.vehicle_type || 'bike', // שימוש ברמת התחבורה האמיתית
         is_available: user.isAvailable || false,
@@ -39,15 +61,67 @@ export default function Profile() {
       };
 
       setCourier(courierData);
-      setStats({
-        total: 127, // זה יבוא מהמשלוחים בפועל
-        thisWeek: 8, // זה יבוא מהמשלוחים בפועל
-        rating: courierData.rating || 5.0
-      });
+      
+      // טעינת נתונים סטטיסטיים אמיתיים
+      await loadStatistics(user.uid);
     } catch (error) {
       console.error("Error loading profile:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadStatistics = async (courierId: string) => {
+    try {
+      // קבלת כל הסטטיסטיקות החודשיות
+      const allMonthsStats = await getMonthlyStats(courierId);
+      
+      // חישוב סה"כ משלוחים
+      const total = allMonthsStats.reduce((sum, month) => sum + month.deliveryCount, 0);
+      
+      // חישוב משלוחים השבוע
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const currentMonthStat = allMonthsStats.find(m => m.month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+      const thisWeekDeliveries = currentMonthStat?.deliveries.filter(d => {
+        const deliveryDate = new Date(d.delivery_time!);
+        return deliveryDate >= weekAgo;
+      }).length || 0;
+      
+      setStats({
+        total,
+        thisWeek: thisWeekDeliveries,
+        rating: 4.8
+      });
+    } catch (error) {
+      console.error("Error loading statistics:", error);
+      setStats({ total: 0, thisWeek: 0, rating: 5.0 });
+    }
+  };
+
+  const loadMonthlyData = async () => {
+    if (!user?.uid) return;
+
+    try {
+      // טעינת נתוני החודש הנוכחי
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      
+      const currentStats = await getCurrentMonthStats(user.uid);
+      const currentDaily = await getDailyStatsForMonth(user.uid, currentYear, currentMonth);
+      
+      setCurrentMonthStats(currentStats);
+      setCurrentMonthData(currentDaily);
+
+      // טעינת נתוני החודש הנבחר
+      const selectedStats = await getMonthlyStats(user.uid, selectedYear, selectedMonth);
+      const selectedDaily = await getDailyStatsForMonth(user.uid, selectedYear, selectedMonth);
+      
+      setSelectedMonthStats(selectedStats.length > 0 ? selectedStats[0] : null);
+      setSelectedMonthData(selectedDaily);
+    } catch (error) {
+      console.error("Error loading monthly data:", error);
     }
   };
 
@@ -112,14 +186,14 @@ export default function Profile() {
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
               <User2 className="w-8 h-8 text-white" />
             </div>
-            <div className="flex-1 text-right">
+            <div className="flex-1 text-left">
               <h3 className="text-xl font-bold text-gray-900 mb-1">
                 {user?.firstName && user?.lastName 
                   ? `${user.firstName} ${user.lastName}` 
                   : user?.username || 'משתמש'
                 }
               </h3>
-              <p className="text-gray-600 mb-2">{user?.email}</p>
+              <p className="text-gray-600 mb-2 ">{user?.email}</p>
               {user?.phone && (
                 <div className="flex items-center gap-1 text-sm text-gray-600 justify-end">
                   <Phone className="w-3 h-3" />
@@ -218,6 +292,64 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* גרף החודש הנוכחי */}
+      {currentMonthStats && currentMonthData && (
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <MonthlyStatsCard
+              deliveryCount={currentMonthStats.deliveryCount}
+              totalEarnings={currentMonthStats.totalEarnings}
+              monthName={currentMonthStats.monthName}
+            />
+            <div className="mt-6">
+              <MonthlyDeliveriesChart
+                data={currentMonthData}
+                title={`משלוחים ב${currentMonthStats.monthName}`}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* בורר חודש וגרף חודש נבחר */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
+            סטטיסטיקות לפי חודש
+          </h3>
+          
+          <MonthSelector
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onMonthChange={(year, month) => {
+              setSelectedYear(year);
+              setSelectedMonth(month);
+            }}
+          />
+
+          {selectedMonthStats && selectedMonthData && (
+            <div className="mt-6 space-y-6">
+              <MonthlyStatsCard
+                deliveryCount={selectedMonthStats.deliveryCount}
+                totalEarnings={selectedMonthStats.totalEarnings}
+                monthName={selectedMonthStats.monthName}
+              />
+              <MonthlyDeliveriesChart
+                data={selectedMonthData}
+                title={`משלוחים ב${selectedMonthStats.monthName}`}
+              />
+            </div>
+          )}
+
+          {(!selectedMonthStats || selectedMonthStats.deliveryCount === 0) && (
+            <div className="mt-6 text-center py-12">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">אין משלוחים בחודש זה</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

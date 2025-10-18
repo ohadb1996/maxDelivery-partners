@@ -1,6 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
-import { Home, Package, History, User as UserIcon, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Package, History, User as UserIcon, X, LogOut } from "lucide-react";
 import { Logo } from "../ui/Logo";
+import { useAuth } from "@/context/AuthContext";
 
 interface SideNavigationProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface SideNavigationProps {
 
 export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const navItems = [
     { name: "דשבורד", path: "/", icon: Home },
@@ -16,6 +19,16 @@ export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps
     { name: "היסטוריה", path: "/history", icon: History },
     { name: "פרופיל", path: "/profile", icon: UserIcon },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      onToggle(); // Close the sidebar
+      navigate('/login');
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
 
   return (
     <>
@@ -77,6 +90,15 @@ export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps
                 </Link>
               );
             })}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-4 p-4 rounded-2xl transition-all w-full text-gray-600 hover:bg-red-50 hover:text-red-600 mt-4"
+            >
+              <LogOut className="w-6 h-6" />
+              <span className="text-lg font-medium">התנתק</span>
+            </button>
           </div>
 
           {/* Footer */}

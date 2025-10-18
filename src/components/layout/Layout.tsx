@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import SideNavigation from "./SideNavigation";
 import { Logo } from "../ui/Logo";
@@ -11,17 +11,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
-  const { user: authUser, logout, isLoading } = useAuth();
+  const { user: authUser, isLoading } = useAuth();
   const [isSideNavOpen, setIsSideNavOpen] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  };
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -66,16 +57,6 @@ export default function Layout({ children }: LayoutProps) {
               )}
                 
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-             
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-             
-              </button>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Delivery, Courier, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { subscribeToAvailableDeliveries, assignDeliveryToCourier } from "@/services/deliveryService";
 
 import MapView from "@/components/courier/MapView";
 import SimpleToggle from "@/components/courier/SimpleToggle";
@@ -18,8 +19,18 @@ export default function Dashboard() {
   useEffect(() => {
     if (authUser) {
       loadData();
-      const interval = setInterval(loadData, 30000);
-      return () => clearInterval(interval);
+      
+      // הרשמה לעדכונים בזמן אמת של משלוחים זמינים
+      console.log('📡 [Dashboard] Subscribing to real-time delivery updates');
+      const unsubscribe = subscribeToAvailableDeliveries((availableDeliveries) => {
+        console.log(`📦 [Dashboard] Received ${availableDeliveries.length} deliveries`);
+        setDeliveries(availableDeliveries);
+      });
+      
+      return () => {
+        console.log('📡 [Dashboard] Unsubscribing from delivery updates');
+        unsubscribe();
+      };
     }
   }, [authUser]);
 
@@ -41,74 +52,26 @@ export default function Dashboard() {
       // Create courier data from auth user
       const courierData: Courier = {
         id: authUser.uid,
-        created_by: authUser.email || "",
+        business_email: authUser.email || "",
         phone: authUser.phone || "",
-        vehicle_type: authUser.vehicle_type || "bike", // שימוש ברמת התחבורה האמיתית
+        vehicle_type: authUser.vehicle_type || "motorcycle", // ברירת מחדל: קטנוע (יכול לקחת גם משלוחי אופניים)
         is_available: authUser.isAvailable || false,
         rating: 4.8, // Default - should be calculated from deliveries
         created_at: authUser.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
       
-      console.log('Dashboard: Created courier data with availability:', courierData.is_available);
+      console.log('📊 [Dashboard] Created courier data:', {
+        id: courierData.id,
+        vehicle_type: courierData.vehicle_type,
+        is_available: courierData.is_available
+      });
 
       setCourier(courierData);
       
-      // Mock available deliveries
-      const mockDeliveries: Delivery[] = [
-        {
-          id: "1",
-          order_number: "ORD-001",
-          customer_name: "Sarah Johnson",
-          customer_phone: "+1234567890",
-          package_description: "Food delivery from Pizza Palace",
-          pickup_address: "123 Main St, Downtown",
-          delivery_address: "456 Oak Ave, Uptown",
-          payment_amount: 15.50,
-          status: "available",
-          required_vehicle_type: "bike", // משלוח לאופניים
-          estimated_distance: "2.3 km",
-          estimated_duration: "15 min",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          order_number: "ORD-002",
-          customer_name: "Mike Chen",
-          customer_phone: "+1234567891",
-          package_description: "Groceries from Fresh Market",
-          pickup_address: "789 Market St, Center",
-          delivery_address: "321 Pine Rd, Suburbs",
-          payment_amount: 22.00,
-          status: "available",
-          required_vehicle_type: "car", // משלוח לרכב
-          estimated_distance: "4.1 km",
-          estimated_duration: "25 min",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: "3",
-          order_number: "ORD-003",
-          customer_name: "Lisa Brown",
-          customer_phone: "+1234567892",
-          package_description: "Large furniture delivery",
-          pickup_address: "555 Furniture St, Warehouse",
-          delivery_address: "777 Home Ave, Residential",
-          payment_amount: 45.00,
-          status: "available",
-          required_vehicle_type: "truck", // משלוח למשאית
-          estimated_distance: "8.5 km",
-          estimated_duration: "35 min",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ];
-      
-      setDeliveries(mockDeliveries);
+      // משלוחים אמיתיים יטענו דרך subscribeToAvailableDeliveries ב-useEffect
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("❌ [Dashboard] Error loading data:", error);
     }
     setIsLoading(false);
   };
@@ -116,7 +79,20 @@ export default function Dashboard() {
   // סינון משלוחים לפי רמת התחבורה של השליח
   const filteredDeliveries = deliveries.filter(delivery => {
     if (!courier) return false;
-    return canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
+    const canTake = canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
+    console.log(`🚗 [Dashboard] Vehicle check:`, {
+      delivery_id: delivery.id,
+      courier_vehicle: courier.vehicle_type,
+      required_vehicle: delivery.required_vehicle_type,
+      can_take: canTake
+    });
+    return canTake;
+  });
+
+  console.log(`📊 [Dashboard] Filtered deliveries:`, {
+    total: deliveries.length,
+    filtered: filteredDeliveries.length,
+    courier_vehicle: courier?.vehicle_type
   });
 
 
@@ -150,10 +126,34 @@ export default function Dashboard() {
     navigate(`/job/${delivery.id}`);
   };
 
-  const handleAcceptJob = (delivery: Delivery) => {
-    console.log('Accepting job:', delivery.id);
-    // TODO: Implement job acceptance logic
-    // This should update the delivery status and assign it to the courier
+  const handleAcceptJob = async (delivery: Delivery) => {
+    if (!authUser || !courier) {
+      console.error('❌ [Dashboard] Cannot accept job - no user or courier');
+      return;
+    }
+
+    if (!courier.is_available) {
+      console.error('❌ [Dashboard] Cannot accept job - courier is not available');
+      return;
+    }
+
+    console.log('📝 [Dashboard] Accepting job:', delivery.id);
+    
+    try {
+      const success = await assignDeliveryToCourier(delivery.id, authUser.uid);
+      
+      if (success) {
+        console.log('✅ [Dashboard] Job accepted successfully');
+        // נווט לדף המשלוח הפעיל
+        navigate('/active');
+      } else {
+        console.error('❌ [Dashboard] Failed to accept job');
+        // TODO: Show error message to user
+      }
+    } catch (error) {
+      console.error('❌ [Dashboard] Error accepting job:', error);
+      // TODO: Show error message to user
+    }
   };
 
   if (isLoading) {

@@ -141,8 +141,6 @@ export default function MapView({ deliveries, isAvailable, onDeliveryClick }: Ma
           );
         })}
       </MapContainer>
-      
-      
     </div>
   );
 }

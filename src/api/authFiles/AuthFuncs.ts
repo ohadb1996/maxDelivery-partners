@@ -62,7 +62,7 @@ export const signUpWithEmailAndPass = async ({
     console.log('[AuthFuncs] Preparing user data for database...');
     // נתוני משתמש ראשוניים
     const userData = {
-      [`Users/${userId}`]: {
+      [`Couriers/${userId}`]: {
         username,
         firstName,
         lastName,
@@ -139,7 +139,7 @@ export const signInWithEmailAndPass = async (
     console.log('[AuthFuncs] Login successful for user:', user.uid);
 
     // עדכון זמן התחברות אחרון
-    await update(ref(db, `Users/${user.uid}`), {
+    await update(ref(db, `Couriers/${user.uid}`), {
       lastLogin: new Date().toISOString()
     });
 
@@ -212,7 +212,7 @@ export const getCurrentUser = (): User | null => {
 // בדיקת סטטוס מנהל
 export const checkAdminStatus = async (userId: string): Promise<boolean> => {
   try {
-    const snapshot = await get(ref(db, `Users/${userId}/isAdmin`));
+    const snapshot = await get(ref(db, `Couriers/${userId}/isAdmin`));
     return !!snapshot.val();
   } catch (error) {
     console.error("שגיאה בבדיקת סטטוס מנהל:", error);
@@ -263,7 +263,7 @@ export const checkUserExistsByEmail = async (email: string): Promise<{ exists: b
 export const checkUsernameAvailability = async (username: string): Promise<{ exists: boolean; userId?: string }> => {
   try {
     // חיפוש ישיר ב-Users
-    const usersRef = ref(db, 'Users');
+    const usersRef = ref(db, 'Couriers');
     const snapshot = await get(usersRef);
     
     if (snapshot.exists()) {
@@ -288,7 +288,7 @@ export const checkUsernameAvailability = async (username: string): Promise<{ exi
 export const checkPhoneAvailability = async (phone: string): Promise<{ exists: boolean; userId?: string }> => {
   try {
     // חיפוש ישיר ב-Users
-    const usersRef = ref(db, 'Users');
+    const usersRef = ref(db, 'Couriers');
     const snapshot = await get(usersRef);
     
     if (snapshot.exists()) {
@@ -313,7 +313,7 @@ export const checkPhoneAvailability = async (phone: string): Promise<{ exists: b
 // בדיקה אם משתמש קיים ב-Database
 export const checkUserExistsInDatabase = async (userId: string): Promise<boolean> => {
   try {
-    const userRef = ref(db, `Users/${userId}`);
+    const userRef = ref(db, `Couriers/${userId}`);
     const snapshot = await get(userRef);
     return snapshot.exists();
   } catch (error) {
@@ -331,7 +331,7 @@ export const createUserDataIfNotExists = async (userId: string, userData: any): 
       console.log('[AuthFuncs] Creating user data in database for:', userId);
       
       const dataToSave = {
-        [`Users/${userId}`]: userData
+        [`Couriers/${userId}`]: userData
       };
       
       await update(ref(db), dataToSave);
@@ -402,8 +402,8 @@ export const updateCourierAvailability = async (userId: string, isAvailable: boo
     console.log('[AuthFuncs] Database instance:', !!db);
     
     const updates = {
-      [`Users/${userId}/isAvailable`]: isAvailable,
-      [`Users/${userId}/lastStatusUpdate`]: new Date().toISOString(),
+      [`Couriers/${userId}/isAvailable`]: isAvailable,
+      [`Couriers/${userId}/lastStatusUpdate`]: new Date().toISOString(),
     };
     
     console.log('[AuthFuncs] Updates object:', updates);
@@ -422,7 +422,7 @@ export const updateCourierAvailability = async (userId: string, isAvailable: boo
  */
 export const getCourierAvailability = async (userId: string): Promise<boolean> => {
   try {
-    const userRef = ref(db, `Users/${userId}/isAvailable`);
+    const userRef = ref(db, `Couriers/${userId}/isAvailable`);
     const snapshot = await get(userRef);
     
     if (snapshot.exists()) {
@@ -441,7 +441,7 @@ export const getCourierAvailability = async (userId: string): Promise<boolean> =
  * מאזין לשינויים בסטטוס הזמינות
  */
 export const onCourierAvailabilityChange = (userId: string, callback: (isAvailable: boolean) => void) => {
-  const userRef = ref(db, `Users/${userId}/isAvailable`);
+  const userRef = ref(db, `Couriers/${userId}/isAvailable`);
   
   return onValue(userRef, (snapshot) => {
     if (snapshot.exists()) {
@@ -596,7 +596,7 @@ export const updateCourierVehicleType = async (userId: string, vehicleType: Vehi
     console.log('[AuthFuncs] Updating courier vehicle type:', { userId, vehicleType });
     
     const updates = {
-      [`Users/${userId}/vehicle_type`]: vehicleType,
+      [`Couriers/${userId}/vehicle_type`]: vehicleType,
     };
     
     await update(ref(db), updates);
@@ -612,7 +612,7 @@ export const updateCourierVehicleType = async (userId: string, vehicleType: Vehi
  */
 export const getCourierVehicleType = async (userId: string): Promise<VehicleType> => {
   try {
-    const userRef = ref(db, `Users/${userId}/vehicle_type`);
+    const userRef = ref(db, `Couriers/${userId}/vehicle_type`);
     const snapshot = await get(userRef);
     
     if (snapshot.exists()) {
@@ -635,7 +635,7 @@ export const getCourierVehicleType = async (userId: string): Promise<VehicleType
  * מאזין לשינויים ברמת התחבורה
  */
 export const onCourierVehicleTypeChange = (userId: string, callback: (vehicleType: VehicleType) => void) => {
-  const userRef = ref(db, `Users/${userId}/vehicle_type`);
+  const userRef = ref(db, `Couriers/${userId}/vehicle_type`);
   
   return onValue(userRef, (snapshot) => {
     if (snapshot.exists()) {
