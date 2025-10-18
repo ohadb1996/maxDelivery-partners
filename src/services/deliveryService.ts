@@ -1,4 +1,4 @@
-import { getDatabase, ref, query, orderByChild, equalTo, get, onValue, update, set } from 'firebase/database';
+import { getDatabase, ref, get, onValue, update, set } from 'firebase/database';
 import { app } from '../api/config/firebase.config';
 import { Delivery, VehicleType } from '@/types';
 
@@ -52,24 +52,25 @@ export interface MonthlyStats {
 }
 
 // פונקציה לחישוב מרחק בין שתי נקודות GPS (Haversine formula)
-const calculateDistance = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number => {
-  const R = 6371; // רדיוס כדור הארץ בקילומטרים
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
+// כרגע לא בשימוש - שמור לעתיד כשנוסיף geocoding
+// const calculateDistance = (
+//   lat1: number,
+//   lon1: number,
+//   lat2: number,
+//   lon2: number
+// ): number => {
+//   const R = 6371; // רדיוס כדור הארץ בקילומטרים
+//   const dLat = (lat2 - lat1) * Math.PI / 180;
+//   const dLon = (lon2 - lon1) * Math.PI / 180;
+//   const a =
+//     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+//     Math.cos(lat1 * Math.PI / 180) *
+//     Math.cos(lat2 * Math.PI / 180) *
+//     Math.sin(dLon / 2) *
+//     Math.sin(dLon / 2);
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// };
 
 // פונקציה להמרת משלוח מ-DB לפורמט Delivery
 const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delivery => {
@@ -118,9 +119,7 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
 };
 
 // פונקציה לשליפת משלוחים זמינים (סטטוס "ממתין")
-export const getAvailableDeliveries = async (
-  courierLocation?: { lat: number; lon: number }
-): Promise<Delivery[]> => {
+export const getAvailableDeliveries = async (): Promise<Delivery[]> => {
   try {
     const db = getDatabase(app);
     const deliveriesRef = ref(db, 'Deliveries');
@@ -162,23 +161,12 @@ export const getAvailableDeliveries = async (
     console.log(`📊 [DeliveryService] Status breakdown:`, statusCounts);
     console.log(`✅ [DeliveryService] Found ${deliveries.length} available deliveries`);
     
-    // אם יש מיקום של השליח, מיין לפי מרחק
-    if (courierLocation) {
-      // כרגע נשתמש במיון פשוט לפי זמן יצירה
-      // בעתיד ניתן להוסיף geocoding למרחק אמיתי
-      deliveries.sort((a, b) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return dateA - dateB; // הישן ביותר ראשון
-      });
-    } else {
-      // בלי מיקום, מיין לפי זמן יצירה (FIFO)
-      deliveries.sort((a, b) => {
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return dateA - dateB; // הישן ביותר ראשון
-      });
-    }
+    // מיין לפי זמן יצירה (FIFO - הישן ביותר ראשון)
+    deliveries.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateA - dateB;
+    });
     
     return deliveries;
   } catch (error) {
@@ -189,8 +177,7 @@ export const getAvailableDeliveries = async (
 
 // פונקציה לעדכון משלוח בזמן אמת
 export const subscribeToAvailableDeliveries = (
-  callback: (deliveries: Delivery[]) => void,
-  courierLocation?: { lat: number; lon: number }
+  callback: (deliveries: Delivery[]) => void
 ): (() => void) => {
   try {
     const db = getDatabase(app);
@@ -220,7 +207,7 @@ export const subscribeToAvailableDeliveries = (
           const delivery = convertDBDeliveryToDelivery(childSnapshot.key!, dbDelivery);
           deliveries.push(delivery);
           console.log(`✅ [DeliveryService] Added available delivery:`, {
-            id: childSnapshot.key,
+        id: childSnapshot.key,
             customer: dbDelivery.customer_name,
             vehicle: dbDelivery.vehicle_type
           });

@@ -11,8 +11,8 @@ interface MonthSelectorProps {
 export default function MonthSelector({ 
   selectedMonth, 
   selectedYear, 
-  onMonthChange,
-  availableMonths = []
+  onMonthChange
+  // availableMonths - לא בשימוש כרגע, שמור לעתיד
 }: MonthSelectorProps) {
   const monthNames = [
     'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',

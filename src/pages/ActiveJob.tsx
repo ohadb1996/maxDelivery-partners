@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Delivery } from "@/types";
 import { updateDeliveryStatus } from "@/services/deliveryService";
 import { useAuth } from "@/context/AuthContext";
-import { ref, get, onValue } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { db } from "@/api/config/firebase.config";
 
 import StatusTimeline from "@/components/courier/StatusTimeline";
@@ -95,8 +95,8 @@ export default function ActiveJob() {
             
             // המר ל-Delivery
             const mappedDelivery: Delivery = {
-              id: activeDeliveryId,
-              order_number: activeDeliveryId.substring(0, 8).toUpperCase(),
+              id: activeDeliveryId!,
+              order_number: activeDeliveryId!.substring(0, 8).toUpperCase(),
               customer_name: dbDelivery.customer_name,
               customer_phone: dbDelivery.customer_phone,
               package_description: dbDelivery.package_description,
