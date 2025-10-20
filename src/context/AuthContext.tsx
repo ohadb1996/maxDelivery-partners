@@ -149,6 +149,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userData = snapshot.val();
         console.log('[AuthContext] ✅ Courier data found:', userData);
         
+        // 🔒 בדיקה אם המשתמש חסום
+        if (userData.isBlocked === true) {
+          console.error('🚨 [AuthContext] BLOCKED USER - Access Denied');
+          alert(`⛔ חשבון זה נחסם על ידי המערכת.\n\nסיבה: ${userData.blockedReason || 'הפרת מדיניות הפלטפורמה'}\n\nליצירת קשר: support@maxdelivery.com`);
+          
+          // התנתק מיד
+          try {
+            await firebaseSignOut(auth);
+          } catch (logoutError) {
+            console.error('[AuthContext] Logout error:', logoutError);
+          }
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        
         // טעינת רמת התחבורה
         let vehicleType: VehicleType = 'motorcycle'; // ברירת מחדל: קטנוע
         try {

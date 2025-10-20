@@ -39,14 +39,20 @@ export function validatePhoneNumber(phone: string, country: CountryCode): PhoneV
     };
   }
 
+  // 🔧 FIX: הסרת 0 מהתחלה אוטומטית (למדינות שמתחילות ב-0)
+  let cleanPhone = phone;
+  if (country === 'IL' && phone.startsWith('0')) {
+    cleanPhone = phone.substring(1); // הסר את ה-0
+  }
+
   // בדיקות ספציפיות למדינה
   switch(country) {
     case 'IL': // ישראל
-      if (phone.length !== 9) {
-        error = 'מספר טלפון ישראלי חייב להכיל בדיוק 9 ספרות (לדוגמה: 0521234567)';
+      if (cleanPhone.length !== 9) {
+        error = 'מספר טלפון ישראלי חייב להכיל 9 ספרות (לדוגמה: 0521234567 או 521234567)';
         isValid = false;
-      } else if (!phone.startsWith('5')) {
-        error = 'מספר טלפון ישראלי חייב להתחיל ב-5 (לדוגמה: 0521234567)';
+      } else if (!cleanPhone.startsWith('5')) {
+        error = 'מספר טלפון ישראלי חייב להתחיל ב-5 אחרי ה-0 (לדוגמה: 0521234567)';
         isValid = false;
       }
       break;
@@ -74,7 +80,7 @@ export function validatePhoneNumber(phone: string, country: CountryCode): PhoneV
 
   return {
     isValid,
-    internationalFormat: isValid ? `${countryInfo.prefix}${phone}` : '',
+    internationalFormat: isValid ? `${countryInfo.prefix}${cleanPhone}` : '',
     error: isValid ? undefined : error
   };
 }

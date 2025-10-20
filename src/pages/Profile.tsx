@@ -385,7 +385,7 @@ export default function Profile() {
                           // נקה שגיאה כשמתחילים לכתוב
                           if (phoneError) setPhoneError('');
                         }}
-                        placeholder="501234567 או 0501234567"
+                        placeholder="50-123-4567"
                         className={`text-left ${phoneError ? 'border-red-500 focus:ring-red-500' : ''}`}
                         dir="ltr"
                       />

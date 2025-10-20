@@ -362,14 +362,11 @@ export default function RegistrationPage() {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => {
+                    // 🔧 FIX: לא מסירים את ה-0 תוך כדי הקלדה - רק ספרות
                     let value = e.target.value.replace(/[^0-9]/g, '');
-                    // הסרת 0 מהתחלה אם קיים
-                    if (value.startsWith('0')) {
-                      value = value.substring(1);
-                    }
                     handleChange("phone")({ ...e, target: { ...e.target, value } });
                   }}
-                  placeholder="501234567 או 0501234567"
+                  placeholder="50-123-4567"
                   className="flex-1 bg-transparent px-3 py-3 text-white focus:outline-none border-none min-w-0"
                   dir="ltr"
                 />

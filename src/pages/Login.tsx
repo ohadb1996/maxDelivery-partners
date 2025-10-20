@@ -8,7 +8,7 @@ import { AuthLink } from '../components/auth/AuthLink';
 import { Logo } from '../components/ui/Logo';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { checkUserExistsInAuth, sendPasswordResetEmail } from '../api/authFiles/AuthFuncs';
+import { sendPasswordResetEmail } from '../api/authFiles/AuthFuncs';
 
 export default function LoginPage() {
   const { login, isAuthInProgress, user, isLoading, clearAuthInProgress } = useAuth();
@@ -118,15 +118,7 @@ export default function LoginPage() {
     setLoginError('');
 
     try {
-      // בדיקה אם המשתמש קיים
-      const userExists = await checkUserExistsInAuth(formData.email);
-      
-      if (!userExists) {
-        setLoginError('כתובת האימייל לא קיימת במערכת');
-        return;
-      }
-
-      // שליחת מייל לאיפוס סיסמה
+      // 🔧 FIX: שליחת מייל ישירות ללא בדיקה (Firebase יטפל בזה)
       await sendPasswordResetEmail(formData.email);
       
       setIsPasswordResetSent(true);
