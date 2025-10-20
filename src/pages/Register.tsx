@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, Check } from "lucide-react";
 import { Lock, User, Mail, Phone, AlertCircle } from "lucide-react";
 import { AuthLayout } from "../components/auth/AuthLayout";
 import { AuthCard } from "../components/auth/AuthCard";
@@ -38,7 +37,6 @@ export default function RegistrationPage() {
   });
   const [errors, setErrors] = useState<Partial<RegistrationForm>>({});
   const [registrationError, setRegistrationError] = useState("");
-  const [showCountryList, setShowCountryList] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   // Note: In React Router, we don't have router events like Next.js
@@ -144,23 +142,6 @@ export default function RegistrationPage() {
     return () => clearTimeout(timeoutId);
   }, [formData.email, formData.firstName, formData.lastName, formData.phone, formData.password, formData.country]);
 
-  // סגירת התפריט בלחיצה מחוץ לו
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.country-selector')) {
-        setShowCountryList(false);
-      }
-    };
-
-    if (showCountryList) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showCountryList]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<RegistrationForm> = {};
@@ -369,85 +350,44 @@ export default function RegistrationPage() {
           />
 
           <div className="space-y-2">
-        <label className="block text-sm mb-2 text-white font-medium">מספר טלפון</label>
-        <div className="relative country-selector">
-          <div className="flex items-center w-full bg-white/10 border border-white/30 rounded-xl focus-within:ring-2 transition-all focus-within:border-blue-400 focus-within:ring-blue-400/20 overflow-hidden">
-            {/* אייקון טלפון (שמאל) */}
-            <div className="px-3 text-gray-300 flex-shrink-0">
-              <Phone className="h-5 w-5" />
-            </div>
-            
-            {/* מספר טלפון (אמצע) */}
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={handleChange("phone")}
-              placeholder={
-                formData.country === "IL"
-                  ? "501234567"
-                  : formData.country === "US"
-                  ? "2015550123"
-                  : "612345678"
-              }
-              className="flex-1 bg-transparent px-3 py-3 text-white focus:outline-none border-none min-w-0"
-              dir="ltr"
-            />
+            <label className="block text-sm mb-2 text-white font-medium">מספר טלפון</label>
+            <div className="relative">
+              <div className="flex items-center w-full bg-white/10 border border-white/30 rounded-xl focus-within:ring-2 transition-all focus-within:border-blue-400 focus-within:ring-blue-400/20 overflow-hidden">
+                {/* אייקון טלפון (שמאל) */}
+                <div className="px-3 text-gray-300 flex-shrink-0">
+                  <Phone className="h-5 w-5" />
+                </div>
+                
+                {/* מספר טלפון (אמצע) */}
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => {
+                    let value = e.target.value.replace(/[^0-9]/g, '');
+                    // הסרת 0 מהתחלה אם קיים
+                    if (value.startsWith('0')) {
+                      value = value.substring(1);
+                    }
+                    handleChange("phone")({ ...e, target: { ...e.target, value } });
+                  }}
+                  placeholder="501234567 או 0501234567"
+                  className="flex-1 bg-transparent px-3 py-3 text-white focus:outline-none border-none min-w-0"
+                  dir="ltr"
+                />
 
-            {/* בחירת מדינה (ימין) */}
-            <div className="flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowCountryList(!showCountryList)}
-                className="h-full px-4 py-3 border-l border-white/30 bg-white/10 hover:bg-white/20 transition-all duration-200 flex items-center gap-2 min-w-[120px] group"
-              >
-                <span className="text-lg">
-                  {countryData[formData.country]?.flag}
-                </span>
-                <span className="text-sm font-medium text-white">
-                  {countryData[formData.country]?.prefix}
-                </span>
-                <ChevronDown className={`h-4 w-4 text-gray-300 transition-transform duration-200 ${
-                  showCountryList ? 'rotate-180' : ''
-                }`} />
-              </button>
-              
-              {showCountryList && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-800/95 backdrop-blur-xl rounded-xl border border-gray-600 overflow-hidden z-50 shadow-2xl">
-                  <div className="max-h-72 overflow-y-auto">
-                    {Object.entries(countryData).map(([code, data]) => (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => {
-                          setFormData({...formData, country: code as CountryCode});
-                          setShowCountryList(false);
-                        }}
-                        className="w-full px-4 py-3 text-right hover:bg-gray-700 flex items-center gap-3 transition-all duration-200"
-                      >
-                        <span className="text-xl">{data.flag}</span>
-                        <div className="flex-1 text-left">
-                          <span className="block text-sm font-medium text-white">
-                            {data.name} ({data.prefix})
-                          </span>
-                        </div>
-                        {code === formData.country && (
-                          <div className="p-1.5 rounded-lg bg-blue-500/20">
-                            <Check className="h-3.5 w-3.5 text-blue-400" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                {/* קידומת ישראל קבועה (ימין) */}
+                <div className="flex-shrink-0">
+                  <div className="h-full px-4 py-3 border-l border-white/30 bg-white/10 flex items-center gap-2 min-w-[100px]">
+                    <span className="text-lg">🇮🇱</span>
+                    <span className="text-sm font-medium text-white">+972</span>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
+            {errors.phone && (
+              <p className="mt-1 text-sm text-red-300">{errors.phone}</p>
+            )}
           </div>
-        </div>
-        {errors.phone && (
-          <p className="mt-1 text-sm text-red-300">{errors.phone}</p>
-        )}
-        
-      </div>
           <AuthInput
             type="password"
             value={formData.password}

@@ -164,10 +164,14 @@ export default function JobDetails() {
                   </Badge>
                 </div>
               </div>
-              {delivery.payment_amount && (
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">השתכרות</p>
-                  <p className="text-lg font-bold text-green-600">₪{delivery.payment_amount}</p>
+              {(delivery.price || delivery.payment_amount) && (
+                <div className="text-right bg-green-50 rounded-xl p-3 border-2 border-green-200">
+                  <p className="text-xs text-green-700 font-medium">💰 ההכנסה שלך</p>
+                  <p className="text-3xl font-bold text-green-600">₪{delivery.price || delivery.payment_amount}</p>
+                  {delivery.distance_km && (
+                    <p className="text-xs text-gray-600 mt-1">📍 מרחק: {delivery.distance_km} ק"מ</p>
+                  )}
+                  <p className="text-[10px] text-gray-500 mt-1">*לאחר עמלת פלטפורמה (15%)</p>
                 </div>
               )}
             </div>

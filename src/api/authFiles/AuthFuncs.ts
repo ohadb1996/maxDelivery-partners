@@ -138,10 +138,8 @@ export const signInWithEmailAndPass = async (
 
     console.log('[AuthFuncs] Login successful for user:', user.uid);
 
-    // עדכון זמן התחברות אחרון
-    await update(ref(db, `Couriers/${user.uid}`), {
-      lastLogin: new Date().toISOString()
-    });
+    // 🔐 לא מעדכנים lastLogin כאן כי זה יוצר רשומה אוטומטית!
+    // הבדיקה והעדכון יבוצעו ב-AuthContext אחרי בדיקת ההרשאות
 
     return user;
   } catch (error: any) {

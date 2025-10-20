@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Delivery } from '@/types';
 import JobCard from './JobCard';
 import { AlertCircle, TrendingUp, Package as PackageIcon } from 'lucide-react';
@@ -9,13 +9,17 @@ interface DraggableJobCardsProps {
   isAvailable: boolean;
   onJobClick: (delivery: Delivery) => void;
   onAcceptJob: (delivery: Delivery) => void;
+  onSelectDelivery: (delivery: Delivery) => void;
+  selectedDeliveryId: string | null;
 }
 
 export default function DraggableJobCards({ 
   deliveries, 
   isAvailable, 
   onJobClick, 
-  onAcceptJob 
+  onAcceptJob,
+  onSelectDelivery,
+  selectedDeliveryId
 }: DraggableJobCardsProps) {
   // Position configuration
   const MIN_TOP_OFFSET = 80; // Space for header (navbar)
@@ -29,83 +33,88 @@ export default function DraggableJobCards({
   const [dragOffset, setDragOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Calculate heights
-  const expandedHeight = window.innerHeight - MIN_TOP_OFFSET;
-  const collapsedHeight = COLLAPSED_VISIBLE_HEIGHT;
+  // Calculate heights (use refs to avoid recalculation)
+  const expandedHeight = useRef(window.innerHeight - MIN_TOP_OFFSET);
+  const collapsedHeight = useRef(COLLAPSED_VISIBLE_HEIGHT);
+  
+  // Update heights on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      expandedHeight.current = window.innerHeight - MIN_TOP_OFFSET;
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
     setStartY(e.clientY);
     setDragOffset(0);
     e.preventDefault();
-  };
+  }, []);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     setIsDragging(true);
     setStartY(e.touches[0].clientY);
     setDragOffset(0);
-  };
+  }, []);
 
-  const handleMove = (clientY: number) => {
-    if (!isDragging) return;
-    
-    // Calculate how much we've dragged from start
-    const delta = clientY - startY;
-    
-    // Update drag offset (clamped to valid range)
-    const maxDrag = expandedHeight - collapsedHeight;
-    if (isExpanded) {
-      // When expanded, only allow dragging down (positive delta)
-      setDragOffset(Math.max(0, Math.min(maxDrag, delta)));
-    } else {
-      // When collapsed, only allow dragging up (negative delta)
-      setDragOffset(Math.max(-maxDrag, Math.min(0, delta)));
-    }
-  };
+  const handleMove = useCallback((clientY: number) => {
+    setDragOffset(() => {
+      const delta = clientY - startY;
+      const maxDrag = expandedHeight.current - collapsedHeight.current;
+      
+      if (isExpanded) {
+        // When expanded, only allow dragging down (positive delta)
+        return Math.max(0, Math.min(maxDrag, delta));
+      } else {
+        // When collapsed, only allow dragging up (negative delta)
+        return Math.max(-maxDrag, Math.min(0, delta));
+      }
+    });
+  }, [startY, isExpanded]);
 
-  const handleMouseMove = (e: MouseEvent) => {
-    handleMove(e.clientY);
-  };
-
-  const handleTouchMove = (e: TouchEvent) => {
-    handleMove(e.touches[0].clientY);
-  };
-
-  const handleEnd = () => {
-    if (!isDragging) return;
-    
+  const handleEnd = useCallback(() => {
     setIsDragging(false);
     
-    // Decide whether to snap to expanded or collapsed based on drag distance
-    const dragDistance = Math.abs(dragOffset);
-    
-    if (dragDistance >= SNAP_THRESHOLD) {
-      // User dragged enough - toggle state
-      if (isExpanded && dragOffset > 0) {
-        // Dragged down while expanded - collapse
-        setIsExpanded(false);
-      } else if (!isExpanded && dragOffset < 0) {
-        // Dragged up while collapsed - expand
-        setIsExpanded(true);
+    setDragOffset(prevOffset => {
+      // Decide whether to snap to expanded or collapsed based on drag distance
+      const dragDistance = Math.abs(prevOffset);
+      
+      if (dragDistance >= SNAP_THRESHOLD) {
+        // User dragged enough - toggle state
+        if (isExpanded && prevOffset > 0) {
+          // Dragged down while expanded - collapse
+          setIsExpanded(false);
+        } else if (!isExpanded && prevOffset < 0) {
+          // Dragged up while collapsed - expand
+          setIsExpanded(true);
+        }
       }
-      // else: dragged in wrong direction, stay in current state
-    }
-    // else: didn't drag enough, stay in current state
-    
-    // Reset drag offset
-    setDragOffset(0);
-  };
-
-  const handleMouseUp = () => handleEnd();
-  const handleTouchEnd = () => handleEnd();
+      
+      return 0; // Reset drag offset
+    });
+  }, [isExpanded]);
 
   useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.addEventListener('touchmove', handleTouchMove, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd);
-    }
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling while dragging
+      handleMove(e.touches[0].clientY);
+    };
+
+    const handleMouseUp = () => handleEnd();
+    const handleTouchEnd = () => handleEnd();
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
@@ -113,23 +122,18 @@ export default function DraggableJobCards({
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isDragging, startY, isExpanded, dragOffset]);
+  }, [isDragging, handleMove, handleEnd]);
 
   // Calculate current height including drag offset
-  const getCurrentHeight = () => {
-    const baseHeight = isExpanded ? expandedHeight : collapsedHeight;
+  const getCurrentHeight = useCallback(() => {
+    const baseHeight = isExpanded ? expandedHeight.current : collapsedHeight.current;
     return baseHeight - dragOffset;
-  };
-
-  const filteredDeliveries = deliveries.filter(() => 
-    isAvailable || !isAvailable // Show all deliveries regardless of availability
-  );
+  }, [isExpanded, dragOffset]);
 
   // Debug logs
   useEffect(() => {
     console.log('📋 [DraggableJobCards] Props changed:', {
       deliveries_count: deliveries.length,
-      filtered_count: filteredDeliveries.length,
       isAvailable,
       deliveries: deliveries.map(d => ({
         id: d.id,
@@ -138,7 +142,7 @@ export default function DraggableJobCards({
         vehicle: d.required_vehicle_type
       }))
     });
-  }, [deliveries, filteredDeliveries, isAvailable]);
+  }, [deliveries, isAvailable]);
 
   return (
     <div 
@@ -160,28 +164,28 @@ export default function DraggableJobCards({
       </div>
       
       {/* Content */}
-      <div className="px-4 pb-24 overflow-y-auto h-full">
+      <div className="px-4 pb-24 overflow-y-auto h-full" style={{ touchAction: isDragging ? 'none' : 'auto' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 text-right">משלוחים זמינים</h2>
-          {filteredDeliveries.length > 0 && (
+          {deliveries.length > 0 && (
             <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
               <TrendingUp className="w-4 h-4" />
-              {filteredDeliveries.length} מתאימים
+              {deliveries.length} מתאימים
             </div>
           )}
         </div>
 
         {/* Status Messages */}
-        {!isAvailable && filteredDeliveries.length > 0 && (
+        {!isAvailable && deliveries.length > 0 && (
           <Alert className="mb-4 border-orange-200 bg-orange-50">
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800 text-sm">
-              יש {filteredDeliveries.length} משלוחים מתאימים - החלק את הכרטיסייה למעלה כדי לראות הכל
+              יש {deliveries.length} משלוחים מתאימים - החלק את הכרטיסייה למעלה כדי לראות הכל
             </AlertDescription>
           </Alert>
         )}
 
-        {isAvailable && filteredDeliveries.length === 0 && (
+        {deliveries.length === 0 && (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <PackageIcon className="w-8 h-8 text-gray-400" />
@@ -193,12 +197,14 @@ export default function DraggableJobCards({
 
         {/* Delivery Cards */}
         <div className="space-y-3 pb-4">
-          {filteredDeliveries.map((delivery) => (
+          {deliveries.map((delivery) => (
             <JobCard
               key={delivery.id}
               delivery={delivery}
               onClick={() => onJobClick(delivery)}
               onAccept={() => onAcceptJob(delivery)}
+              onSelect={() => onSelectDelivery(delivery)}
+              isSelected={delivery.id === selectedDeliveryId}
             />
           ))}
         </div>

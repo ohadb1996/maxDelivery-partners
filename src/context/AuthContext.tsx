@@ -84,6 +84,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (firebaseUser) {
         try {
           console.log('[AuthContext] Loading user data for:', firebaseUser.uid);
+          
+          // 🔐 בדיקה פשוטה: האם המשתמש קיים ב-Couriers?
+          const db = getDatabase(app);
+          const courierRef = ref(db, `Couriers/${firebaseUser.uid}`);
+          const courierSnapshot = await get(courierRef);
+          
+          if (!courierSnapshot.exists()) {
+            // משתמש לא קיים באפליקציית השליחים - חסום גישה
+            console.error('🚨 [AuthContext] User not found in Couriers - Access Denied');
+            // התנתק ישירות ללא קריאה לפונקציה חיצונית (למניעת stale closure)
+            try {
+              await firebaseSignOut(auth);
+            } catch (logoutError) {
+              console.error('[AuthContext] Logout error:', logoutError);
+            }
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          
+          // המשתמש קיים - טען נתונים
           await loadUserData(firebaseUser);
           console.log('[AuthContext] User data loaded successfully in auth listener');
         } catch (error) {
@@ -129,7 +150,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('[AuthContext] ✅ Courier data found:', userData);
         
         // טעינת רמת התחבורה
-        let vehicleType: VehicleType = 'bike'; // ברירת מחדל
+        let vehicleType: VehicleType = 'motorcycle'; // ברירת מחדל: קטנוע
         try {
           vehicleType = await getCourierVehicleType(firebaseUser.uid);
         } catch (error) {
@@ -153,83 +174,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('[AuthContext] Setting user with username:', authUser.username, 'vehicle_type:', authUser.vehicle_type);
         setUser(authUser);
       } else {
-        // 🚨 פרצת אבטחה: משתמש לא קיים ב-Couriers!
+        // 🚨 משתמש לא קיים ב-Couriers - לא מתיר גישה!
         console.error('🚨 [AuthContext] SECURITY: User not found in Couriers database!');
         console.error('🚨 [AuthContext] This user may be a Business user trying to access the Courier app');
-        console.error('🚨 [AuthContext] Logging out and blocking access...');
-        
-        // אם זה משתמש חדש ואין עדיין נתונים, נסה שוב אחרי עיכוב
-        if (retryCount < 3) {
-          console.log('[AuthContext] Retrying loadUserData in 1 second...');
-          setTimeout(() => {
-            loadUserData(firebaseUser, retryCount + 1);
-          }, 1000);
-          return;
-        }
-        
-        // אחרי 3 נסיונות - חסום גישה!
-        console.error('🚨 [AuthContext] BLOCKING ACCESS: User does not exist in Couriers database');
-        alert('שגיאת הרשאות: חשבון זה לא רשום כשליח.\n\nאנא השתמש באפליקציית בעלי העסקים או הירשם מחדש כשליח.');
-        
-        // התנתק מיד
-        const auth = getAuth(app);
-        await auth.signOut();
+        console.log('[AuthContext] Access denied - user does not exist in Couriers');
         setUser(null);
         return;
-        
-        // 🚫 הקוד הישן הוסר - לא יוצרים נתונים אוטומטית!
-        console.log('[AuthContext] OLD CODE - Creating basic user data for existing Firebase user');
-        try {
-              const basicUserData = {
-                username: firebaseUser.email?.split('@')[0] || 'user',
-                firstName: 'משתמש',
-                lastName: 'חדש',
-                email: firebaseUser.email || '',
-                phone: firebaseUser.phoneNumber || '',
-                country: 'IL',
-                createdAt: firebaseUser.metadata.creationTime || new Date().toISOString(),
-                lastLogin: new Date().toISOString(),
-                isAvailable: false,
-                lastStatusUpdate: new Date().toISOString()
-              };
-          
-          // נסה ליצור את הנתונים ב-Database
-          const { createUserDataIfNotExists } = await import('../api/authFiles/AuthFuncs');
-          await createUserDataIfNotExists(firebaseUser.uid, basicUserData);
-          
-          // נסה לטעון שוב
-          const retrySnapshot = await get(userRef);
-          if (retrySnapshot.exists()) {
-            const userData = retrySnapshot.val();
-            const authUser = {
-              ...firebaseUser,
-              username: userData.username,
-              firstName: userData.firstName,
-              lastName: userData.lastName,
-              phone: userData.phone,
-              address: userData.address,
-              country: userData.country,
-              createdAt: userData.createdAt,
-              lastLogin: userData.lastLogin,
-              isAvailable: userData.isAvailable || false,
-              lastStatusUpdate: userData.lastStatusUpdate
-            };
-            setUser(authUser);
-            return;
-          }
-        } catch (createError) {
-          console.error('[AuthContext] Error creating basic user data:', createError);
-        }
-        
-        // אם הכל נכשל, השתמש בנתוני Firebase בלבד
-        setUser(firebaseUser);
       }
     } catch (error) {
       console.error('[AuthContext] Error loading user data:', error);
       if (error instanceof Error) {
         console.error('[AuthContext] Error details:', error.message, error.stack);
       }
-      setUser(firebaseUser);
+      // אם יש שגיאה, לא מתיר גישה
+      setUser(null);
     }
   };
 
@@ -239,13 +197,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('[AuthContext] Starting login for email:', email);
       const user = await signInWithEmailAndPass(email, password);
-      console.log('[AuthContext] Login successful, loading user data...');
+      console.log('[AuthContext] Login successful, checking authorization...');
       
-      // רק אם ההתחברות הצליחה, נטען את המידע
+      // בדוק אם ההתחברות הצליחה
       if (user) {
+        const db = getDatabase(app);
+        
+        // 🔐 בדיקה פשוטה: האם המשתמש קיים ב-Couriers?
+        const courierRef = ref(db, `Couriers/${user.uid}`);
+        const courierSnapshot = await get(courierRef);
+        
+        if (!courierSnapshot.exists()) {
+          // משתמש לא רשום באפליקציית השליחים
+          console.error('🚨 [AuthContext] Access Denied - User not registered in Courier app');
+          alert('שגיאת הרשאות!\n\nחשבון זה לא רשום באפליקציית השליחים.\n\nייתכן שזהו חשבון בעל עסק - אנא השתמש באפליקציית ניהול המשלוחים.\nאו הירשם מחדש כשליח.');
+          await logout();
+          setIsAuthInProgress(false);
+          throw new Error('חשבון זה לא רשום באפליקציית השליחים');
+        }
+        
+        // המשתמש רשום - טען נתונים
         await loadUserData(user as User);
         console.log('[AuthContext] User data loaded successfully');
-        // האפס את isAuthInProgress רק אחרי שהכל הצליח
         setIsAuthInProgress(false);
         return user as AuthUser;
       } else {

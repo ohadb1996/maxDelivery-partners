@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Delivery } from "@/types";
 import { updateDeliveryStatus } from "@/services/deliveryService";
 import { useAuth } from "@/context/AuthContext";
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, get } from 'firebase/database';
 import { db } from "@/api/config/firebase.config";
 
 import StatusTimeline from "@/components/courier/StatusTimeline";
@@ -44,7 +44,7 @@ export default function ActiveJob() {
 
   useEffect(() => {
     if (user) {
-      loadActiveDelivery();
+    loadActiveDelivery();
     }
   }, [user]);
 
@@ -168,6 +168,24 @@ export default function ActiveJob() {
       return;
     }
 
+    // ✅ NEW: Lock mechanism - courier cannot advance from "arrived_pickup" without business confirmation
+    if (delivery.status === 'arrived_pickup' && newStatus === 'picked_up') {
+      // Check if business owner already confirmed pickup in DB
+      const deliveryRef = ref(db, `Deliveries/${delivery.id}`);
+      const snapshot = await get(deliveryRef);
+      
+      if (snapshot.exists()) {
+        const dbDelivery = snapshot.val();
+        if (dbDelivery.status !== 'נאסף' && dbDelivery.status !== 'picked_up') {
+          // Business hasn't confirmed yet - show message and block
+          alert('⏳ ממתין לאישור בעל העסק...\n\nבעל העסק צריך לאשר שהחבילה נאספה לפני שתוכל להמשיך.');
+          console.warn('🔒 [ActiveJob] Pickup blocked - awaiting business confirmation');
+          setIsUpdating(false);
+          return;
+        }
+      }
+    }
+
     setIsUpdating(true);
     try {
       console.log(`📝 [ActiveJob] Updating status to ${newStatus}`);
@@ -279,10 +297,14 @@ export default function ActiveJob() {
                 <h2 className="text-xl font-bold text-gray-900">{delivery.customer_name}</h2>
                 <p className="text-gray-600">{delivery.package_description}</p>
               </div>
-              {delivery.payment_amount && delivery.payment_amount > 0 && (
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">השתכרות</p>
-                  <p className="text-lg font-bold text-green-600">₪{delivery.payment_amount}</p>
+              {(delivery.price || delivery.payment_amount) && (
+                <div className="text-right bg-green-50 rounded-xl p-3 border-2 border-green-200">
+                  <p className="text-xs text-green-700 font-medium">💰 ההכנסה שלך</p>
+                  <p className="text-3xl font-bold text-green-600">₪{delivery.price || delivery.payment_amount}</p>
+                  {delivery.distance_km && (
+                    <p className="text-xs text-gray-600 mt-1">📍 מרחק: {delivery.distance_km} ק"מ</p>
+                  )}
+                  <p className="text-[10px] text-gray-500 mt-1">*לאחר עמלת פלטפורמה (15%)</p>
                 </div>
               )}
             </div>
@@ -327,14 +349,14 @@ export default function ActiveJob() {
                     <Navigation className="w-4 h-4 ml-2" />
                     Waze
                   </Button>
-                  <Button
+                <Button
                     onClick={() => openGoogleMaps(delivery.pickup_address)}
-                    variant="outline"
+                  variant="outline"
                     className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                  >
+                >
                     <Navigation className="w-4 h-4 ml-2" />
                     Google Maps
-                  </Button>
+                </Button>
                 </div>
               )}
             </CardContent>
@@ -366,14 +388,14 @@ export default function ActiveJob() {
                     <Navigation className="w-4 h-4 ml-2" />
                     Waze
                   </Button>
-                  <Button
+                <Button
                     onClick={() => openGoogleMaps(delivery.delivery_address)}
-                    variant="outline"
+                  variant="outline"
                     className="border-green-300 text-green-600 hover:bg-green-50"
-                  >
+                >
                     <Navigation className="w-4 h-4 ml-2" />
                     Google Maps
-                  </Button>
+                </Button>
                 </div>
               )}
             </CardContent>
@@ -399,17 +421,17 @@ export default function ActiveJob() {
                 : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
             } text-white`}
           >
-          {isUpdating ? (
-            <span className="flex items-center gap-2">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            {isUpdating ? (
+              <span className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               מעדכן...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              {nextAction.label}
-            </span>
-          )}
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                {nextAction.label}
+              </span>
+            )}
           </Button>
         )}
       </motion.div>

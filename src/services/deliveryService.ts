@@ -88,6 +88,10 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
   
   console.log(`🔄 [DeliveryService] Mapped vehicle type: ${dbDelivery.vehicle_type} -> ${mappedVehicleType}`);
   
+  // חישוב הכנסת השליח (85% מהמחיר המלא)
+  const fullPrice = (dbDelivery as any).price || 0;
+  const courierEarnings = fullPrice > 0 ? Math.round(fullPrice * 0.85) : 0;
+  
   const delivery: Delivery = {
     id,
     order_number: id.substring(0, 8).toUpperCase(),
@@ -98,7 +102,9 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
     pickup_phone: dbDelivery.customer_phone, // מספר טלפון לאיסוף
     delivery_address: deliveryAddress,
     delivery_notes: dbDelivery.delivery_notes || '',
-    payment_amount: 0, // יש להוסיף חישוב מחיר
+    payment_amount: courierEarnings, // הכנסת השליח (85% מהמחיר)
+    price: courierEarnings, // הכנסת השליח
+    distance_km: (dbDelivery as any).distance_km || 0, // מרחק בק"מ
     status: 'available', // המרת "ממתין" ל-"available"
     required_vehicle_type: mappedVehicleType,
     estimated_distance: '0 km', // יעודכן בהמשך
@@ -112,7 +118,10 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
     order_number: delivery.order_number,
     customer: delivery.customer_name,
     required_vehicle: delivery.required_vehicle_type,
-    status: delivery.status
+    status: delivery.status,
+    fullPrice: fullPrice,
+    courierEarnings: courierEarnings,
+    commission: '15%'
   });
   
   return delivery;
@@ -150,8 +159,8 @@ export const getAvailableDeliveries = async (): Promise<Delivery[]> => {
         business_email: dbDelivery.business_email
       });
       
-      // סנן רק משלוחים במצב "ממתין"
-      if (dbDelivery.status === 'ממתין') {
+      // ✅ סנן רק משלוחים במצב "מוכן לאיסוף" (לאחר אישור בעל העסק)
+      if (dbDelivery.status === 'מוכן לאיסוף' || dbDelivery.status === 'מוכן' || dbDelivery.status === 'ready') {
         const delivery = convertDBDeliveryToDelivery(childSnapshot.key!, dbDelivery);
         deliveries.push(delivery);
       }
@@ -194,7 +203,7 @@ export const subscribeToAvailableDeliveries = (
       let totalCount = 0;
       const statusCounts: Record<string, number> = {};
       
-      snapshot.forEach((childSnapshot) => {
+    snapshot.forEach((childSnapshot) => {
         totalCount++;
         const dbDelivery = childSnapshot.val() as DBDelivery;
         
@@ -202,8 +211,8 @@ export const subscribeToAvailableDeliveries = (
         const status = dbDelivery.status || 'undefined';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
         
-        // סנן רק משלוחים במצב "ממתין"
-        if (dbDelivery.status === 'ממתין') {
+        // ✅ סנן רק משלוחים במצב "מוכן לאיסוף" (לאחר אישור בעל העסק)
+        if (dbDelivery.status === 'מוכן לאיסוף' || dbDelivery.status === 'מוכן' || dbDelivery.status === 'ready') {
           const delivery = convertDBDeliveryToDelivery(childSnapshot.key!, dbDelivery);
           deliveries.push(delivery);
           console.log(`✅ [DeliveryService] Added available delivery:`, {
@@ -297,8 +306,9 @@ export const assignDeliveryToCourier = async (
     const deliveryData = deliverySnapshot.val();
     
     // בדוק שהמשלוח עדיין זמין
-    if (deliveryData.status !== 'ממתין') {
-      console.error(`❌ [DeliveryService] Delivery ${deliveryId} is not available (status: ${deliveryData.status})`);
+    const availableStatuses = ['מוכן לאיסוף', 'מוכן', 'ready'];
+    if (!availableStatuses.includes(deliveryData.status)) {
+      console.error(`❌ [DeliveryService] Delivery ${deliveryId} is not available for pickup (status: ${deliveryData.status})`);
       return false;
     }
     
@@ -467,9 +477,11 @@ export const getMonthlyStats = async (courierId: string, year?: number, month?: 
     const monthlyMap = new Map<string, Delivery[]>();
     
     deliveries.forEach(delivery => {
-      if (!delivery.delivery_time) return;
+      // נשתמש ב-delivery_time או createdAt או updated_at
+      const dateString = delivery.delivery_time || delivery.created_at || delivery.updated_at;
+      if (!dateString) return;
       
-      const date = new Date(delivery.delivery_time);
+      const date = new Date(dateString);
       const deliveryYear = date.getFullYear();
       const deliveryMonth = date.getMonth();
       
@@ -547,8 +559,10 @@ export const getDailyStatsForMonth = async (
     
     // סינון משלוחים לחודש הספציפי
     const monthDeliveries = deliveries.filter(d => {
-      if (!d.delivery_time) return false;
-      const date = new Date(d.delivery_time);
+      const dateString = d.delivery_time || d.created_at || d.updated_at;
+      if (!dateString) return false;
+      
+      const date = new Date(dateString);
       return date.getFullYear() === year && date.getMonth() === month;
     });
     
@@ -569,7 +583,10 @@ export const getDailyStatsForMonth = async (
     
     // מילוי הנתונים
     monthDeliveries.forEach(delivery => {
-      const date = new Date(delivery.delivery_time!);
+      const dateString = delivery.delivery_time || delivery.created_at || delivery.updated_at;
+      if (!dateString) return;
+      
+      const date = new Date(dateString);
       const day = date.getDate();
       const stats = dailyMap.get(day)!;
       
@@ -582,6 +599,27 @@ export const getDailyStatsForMonth = async (
   } catch (error) {
     console.error('Error calculating daily stats:', error);
     return [];
+  }
+};
+
+// פונקציה לחישוב דירוג ממוצע של שליח
+export const getCourierRating = async (courierId: string): Promise<number> => {
+  try {
+    const deliveries = await getCourierDeliveries(courierId);
+    
+    // סינון רק משלוחים שהושלמו
+    const completedDeliveries = deliveries.filter(d => d.status === 'delivered');
+    
+    if (completedDeliveries.length === 0) {
+      return 4.8; // דירוג ברירת מחדל לשליחים חדשים
+    }
+    
+    // כרגע אין שדה rating במשלוחים, אז נחזיר דירוג ברירת מחדל
+    // בעתיד אפשר להוסיף rating לכל משלוח
+    return 4.8;
+  } catch (error) {
+    console.error('Error calculating courier rating:', error);
+    return 4.8;
   }
 };
 

@@ -11,9 +11,11 @@ interface JobCardProps {
   delivery: Delivery;
   onClick: () => void;
   onAccept?: () => void;
+  onSelect?: () => void;
+  isSelected?: boolean;
 }
 
-export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
+export default function JobCard({ delivery, onClick, onAccept, onSelect, isSelected = false }: JobCardProps) {
   const { user } = useAuth();
   const isAvailable = user?.isAvailable || false;
 
@@ -38,6 +40,13 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
     }
   };
 
+  const handleSelectClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    if (onSelect) {
+      onSelect();
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -47,9 +56,11 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
     >
       <Card 
         className={`cursor-pointer hover:shadow-lg transition-all border-2 ${
-          isAvailable 
-            ? 'hover:border-blue-300' 
-            : 'border-gray-200 opacity-75'
+          isSelected 
+            ? 'border-blue-500 bg-blue-50 shadow-md' 
+            : isAvailable 
+              ? 'hover:border-blue-300' 
+              : 'border-gray-200 opacity-75'
         }`}
         onClick={onClick}
       >
@@ -60,10 +71,15 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
                 <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
                   {delivery.order_number || `#${delivery.id.slice(0, 8)}`}
                 </Badge>
-                {delivery.payment_amount && (
+                {(delivery.price || delivery.payment_amount) && (
                   <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
                     <DollarSign className="w-3 h-3 mr-1" />
-                    ${delivery.payment_amount}
+                    ₪{delivery.price || delivery.payment_amount}
+                  </Badge>
+                )}
+                {delivery.distance_km && (
+                  <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">
+                    📍 {delivery.distance_km} ק"מ
                   </Badge>
                 )}
                 <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
@@ -118,8 +134,8 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
             )}
           </div>
 
-          {/* Accept Button */}
-          <div className="mt-4 pt-3 border-t">
+          {/* Action Buttons */}
+          <div className="mt-4 pt-3 border-t space-y-2">
             {!isAvailable ? (
               <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-gray-400" />
@@ -129,12 +145,31 @@ export default function JobCard({ delivery, onClick, onAccept }: JobCardProps) {
                 </div>
               </div>
             ) : (
-              <Button
-                onClick={handleAcceptClick}
-                className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
-              >
-                קבל את המשלוח הזה
-              </Button>
+              <>
+                {isSelected && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <p className="text-xs font-medium text-blue-700">משלוח זה מוצג במפה</p>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  {onSelect && (
+                    <Button
+                      onClick={handleSelectClick}
+                      variant="outline"
+                      className="flex-1 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-3"
+                    >
+                      צפה במסלול
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleAcceptClick}
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3"
+                  >
+                    קבל משלוח
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </CardContent>

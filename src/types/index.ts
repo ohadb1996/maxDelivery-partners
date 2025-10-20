@@ -44,6 +44,8 @@ export interface Delivery {
   delivery_address: string;
   delivery_notes?: string;
   payment_amount?: number;
+  price?: number; // מחיר משלוח מחושב
+  distance_km?: number; // מרחק בק"מ
   status: 'available' | 'accepted' | 'arrived_pickup' | 'picked_up' | 'arrived_delivery' | 'delivered' | 'cancelled';
   assigned_courier?: string;
   required_vehicle_type: VehicleType; // רמת הרכב הנדרשת למשלוח

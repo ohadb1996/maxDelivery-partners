@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [courier, setCourier] = useState<Courier | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
 
   useEffect(() => {
     if (authUser) {
@@ -95,6 +96,22 @@ export default function Dashboard() {
     courier_vehicle: courier?.vehicle_type
   });
 
+  // אוטומטית בוחר את המשלוח הראשון כברירת מחדל
+  useEffect(() => {
+    if (filteredDeliveries.length > 0) {
+      // אם אין משלוח נבחר או המשלוח הנבחר לא ברשימה המסוננת
+      const isCurrentSelectionValid = selectedDelivery && 
+        filteredDeliveries.some(d => d.id === selectedDelivery.id);
+      
+      if (!isCurrentSelectionValid) {
+        console.log('📍 [Dashboard] Auto-selecting first delivery:', filteredDeliveries[0].id);
+        setSelectedDelivery(filteredDeliveries[0]);
+      }
+    } else {
+      setSelectedDelivery(null);
+    }
+  }, [filteredDeliveries]);
+
 
   const toggleAvailability = async () => {
     console.log('Dashboard: toggleAvailability called, current availability:', courier?.is_available);
@@ -123,6 +140,12 @@ export default function Dashboard() {
   };
 
   const handleJobClick = (delivery: Delivery) => {
+    console.log('🔘 [Dashboard] Delivery clicked:', delivery.id);
+    setSelectedDelivery(delivery);
+  };
+
+  const handleSelectDelivery = (delivery: Delivery) => {
+    console.log('➡️ [Dashboard] Navigate to delivery details:', delivery.id);
     navigate(`/job/${delivery.id}`);
   };
 
@@ -177,6 +200,8 @@ export default function Dashboard() {
           deliveries={filteredDeliveries}
           isAvailable={courier?.is_available || false}
           onDeliveryClick={handleJobClick}
+          selectedDelivery={selectedDelivery}
+          courierVehicleType={courier?.vehicle_type || 'motorcycle'}
         />
       </div>
 
@@ -186,6 +211,8 @@ export default function Dashboard() {
         isAvailable={courier?.is_available || false}
         onJobClick={handleJobClick}
         onAcceptJob={handleAcceptJob}
+        onSelectDelivery={handleSelectDelivery}
+        selectedDeliveryId={selectedDelivery?.id || null}
       />
 
       {/* Simple Toggle - Bottom Fixed */}

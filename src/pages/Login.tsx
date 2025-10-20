@@ -94,9 +94,9 @@ export default function LoginPage() {
       // לא מנקים את isAuthInProgress כדי לא להפריע לזיהוי הבעלים
       
     } catch (error: any) {
-      // This should rarely happen now since we handle errors gracefully in AuthContext
-      console.error('[LoginPage] Unexpected error during login:', error);
-      setLoginError('אירעה שגיאה בהתחברות. אנא נסה שוב.');
+      console.error('[LoginPage] Error during login:', error);
+      // הצג את הודעת השגיאה האמיתית
+      setLoginError(error.message || 'אירעה שגיאה בהתחברות. אנא נסה שוב.');
     } finally {
       setIsLoginLoading(false);
     }
