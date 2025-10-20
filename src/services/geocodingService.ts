@@ -1,12 +1,12 @@
 import { VehicleType } from '@/types';
 
 // הגדרת סוגי המסלול לפי סוג רכב
-const TRAVEL_MODE_MAP: Record<VehicleType, string> = {
-  bike: 'bicycling',
-  motorcycle: 'driving', // אופנוע נחשב כנהיגה
-  car: 'driving',
-  truck: 'driving'
-};
+// const TRAVEL_MODE_MAP: Record<VehicleType, string> = {
+//   bike: 'bicycling',
+//   motorcycle: 'driving', // אופנוע נחשב כנהיגה
+//   car: 'driving',
+//   truck: 'driving'
+// };
 
 export interface LatLng {
   lat: number;

@@ -9,7 +9,6 @@ import { Logo } from "../components/ui/Logo";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
-  countryData,
   CountryCode
 } from "../api/utils/phoneValidity";
 

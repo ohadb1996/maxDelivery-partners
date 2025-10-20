@@ -37,8 +37,8 @@ export default function Profile() {
   const [phoneError, setPhoneError] = useState('');
   
   // מצבים לגרפים
-  const [currentMonthData, setCurrentMonthData] = useState<any>(null);
-  const [currentMonthStats, setCurrentMonthStats] = useState<any>(null);
+  const [, setCurrentMonthData] = useState<any>(null);
+  const [, setCurrentMonthStats] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedMonthData, setSelectedMonthData] = useState<any>(null);

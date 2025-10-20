@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Delivery, VehicleType } from '@/types';
-import { geocodeAddressWithCache, getRoute, decodePolyline, LatLng, RouteData } from '@/services/geocodingService';
+import { geocodeAddressWithCache, getRoute, decodePolyline, LatLng } from '@/services/geocodingService';
 
 // Fix for default markers in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -56,9 +56,6 @@ interface MapViewProps {
 }
 
 export default function MapView({ 
-  deliveries, 
-  isAvailable, 
-  onDeliveryClick, 
   selectedDelivery,
   courierVehicleType 
 }: MapViewProps) {
