@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Delivery, Courier, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { subscribeToAvailableDeliveries, assignDeliveryToCourier } from "@/services/deliveryService";
+import { subscribeToAvailableDeliveries, assignDeliveryToCourier, assignBatchToCourier } from "@/services/deliveryService";
+import { findBatchableDeliveries, DeliveryBatch } from "@/services/batchingService";
 
 import MapView from "@/components/courier/MapView";
 import SimpleToggle from "@/components/courier/SimpleToggle";
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user: authUser, updateAvailability } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [batches, setBatches] = useState<DeliveryBatch[]>([]);
   const [courier, setCourier] = useState<Courier | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
@@ -96,6 +98,17 @@ export default function Dashboard() {
     courier_vehicle: courier?.vehicle_type
   });
 
+  // 🔄 Calculate batches from filtered deliveries
+  useEffect(() => {
+    if (filteredDeliveries.length >= 2) {
+      const batchOpportunities = findBatchableDeliveries(filteredDeliveries, 2); // Max 2km between drop-offs
+      console.log(`📦 [Dashboard] Found ${batchOpportunities.length} batch opportunities`);
+      setBatches(batchOpportunities);
+    } else {
+      setBatches([]);
+    }
+  }, [filteredDeliveries]);
+
   // אוטומטית בוחר את המשלוח הראשון כברירת מחדל
   useEffect(() => {
     if (filteredDeliveries.length > 0) {
@@ -179,6 +192,37 @@ export default function Dashboard() {
     }
   };
 
+  const handleAcceptBatch = async (batch: DeliveryBatch) => {
+    if (!authUser || !courier) {
+      console.error('❌ [Dashboard] Cannot accept batch - no user or courier');
+      return;
+    }
+
+    if (!courier.is_available) {
+      console.error('❌ [Dashboard] Cannot accept batch - courier is not available');
+      return;
+    }
+
+    console.log('📦 [Dashboard] Accepting batch:', batch.id);
+    
+    try {
+      const deliveryIds: [string, string] = [batch.deliveries[0].id, batch.deliveries[1].id];
+      const success = await assignBatchToCourier(deliveryIds, authUser.uid);
+      
+      if (success) {
+        console.log('✅ [Dashboard] Batch accepted successfully');
+        // נווט לדף המשלוח הפעיל
+        navigate('/active');
+      } else {
+        console.error('❌ [Dashboard] Failed to accept batch');
+        // TODO: Show error message to user
+      }
+    } catch (error) {
+      console.error('❌ [Dashboard] Error accepting batch:', error);
+      // TODO: Show error message to user
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-4">
@@ -208,9 +252,11 @@ export default function Dashboard() {
       {/* Draggable Job Cards */}
       <DraggableJobCards
         deliveries={filteredDeliveries}
+        batches={batches}
         isAvailable={courier?.is_available || false}
         onJobClick={handleJobClick}
         onAcceptJob={handleAcceptJob}
+        onAcceptBatch={handleAcceptBatch}
         onSelectDelivery={handleSelectDelivery}
         selectedDeliveryId={selectedDelivery?.id || null}
       />

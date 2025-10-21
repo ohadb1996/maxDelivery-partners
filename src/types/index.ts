@@ -56,6 +56,18 @@ export interface Delivery {
   estimated_duration?: string;
   created_at: string;
   updated_at: string;
+  // Business identification fields (for batching)
+  business_name?: string;
+  business_email?: string;
+  // Coordinate fields (for batching and mapping)
+  delivery_coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  pickup_coordinates?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface DeliveryStats {

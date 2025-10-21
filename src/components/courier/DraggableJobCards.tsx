@@ -1,23 +1,29 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Delivery } from '@/types';
 import JobCard from './JobCard';
+import BatchDeliveryCard from './BatchDeliveryCard';
+import { DeliveryBatch } from '@/services/batchingService';
 import { AlertCircle, TrendingUp, Package as PackageIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DraggableJobCardsProps {
   deliveries: Delivery[];
+  batches?: DeliveryBatch[];
   isAvailable: boolean;
   onJobClick: (delivery: Delivery) => void;
   onAcceptJob: (delivery: Delivery) => void;
+  onAcceptBatch?: (batch: DeliveryBatch) => void;
   onSelectDelivery: (delivery: Delivery) => void;
   selectedDeliveryId: string | null;
 }
 
 export default function DraggableJobCards({ 
   deliveries, 
+  batches = [],
   isAvailable, 
   onJobClick, 
   onAcceptJob,
+  onAcceptBatch,
   onSelectDelivery,
   selectedDeliveryId
 }: DraggableJobCardsProps) {
@@ -195,18 +201,50 @@ export default function DraggableJobCards({
           </div>
         )}
 
-        {/* Delivery Cards */}
+        {/* Batch Opportunities - Show first */}
+        {batches.length > 0 && (
+          <div className="space-y-3 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
+              <h3 className="text-sm font-bold text-purple-800 flex items-center gap-2">
+                <PackageIcon className="w-4 h-4" />
+                🎯 משלוחים כפולים זמינים - הכנסה כפולה בנסיעה אחת!
+              </h3>
+              <p className="text-xs text-purple-600 mt-1">
+                שני משלוחים מאותו עסק עם יעדים קרובים (עד 2 ק"מ)
+              </p>
+            </div>
+            {batches.map((batch) => (
+              <BatchDeliveryCard
+                key={batch.id}
+                batch={batch}
+                onAccept={onAcceptBatch || (() => {})}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Individual Delivery Cards */}
         <div className="space-y-3 pb-4">
-          {deliveries.map((delivery) => (
-            <JobCard
-              key={delivery.id}
-              delivery={delivery}
-              onClick={() => onJobClick(delivery)}
-              onAccept={() => onAcceptJob(delivery)}
-              onSelect={() => onSelectDelivery(delivery)}
-              isSelected={delivery.id === selectedDeliveryId}
-            />
-          ))}
+          {deliveries
+            .filter(delivery => {
+              // סנן משלוחים שכבר חלק מבטח
+              const isInBatch = batches.some(batch => 
+                batch.deliveries[0].id === delivery.id || 
+                batch.deliveries[1].id === delivery.id
+              );
+              return !isInBatch;
+            })
+            .map((delivery) => (
+              <JobCard
+                key={delivery.id}
+                delivery={delivery}
+                onClick={() => onJobClick(delivery)}
+                onAccept={() => onAcceptJob(delivery)}
+                onSelect={() => onSelectDelivery(delivery)}
+                isSelected={delivery.id === selectedDeliveryId}
+              />
+            ))
+          }
         </div>
       </div>
     </div>

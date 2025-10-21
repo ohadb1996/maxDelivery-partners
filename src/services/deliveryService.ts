@@ -30,6 +30,19 @@ interface DBDelivery {
   status: string;
   createdAt: string;
   created_date: string;
+  accepted_time?: string;
+  pickup_time?: string;
+  delivery_time?: string;
+  updated_at?: string;
+  // Coordinate fields (from geocoding)
+  delivery_coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  pickup_coordinates?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 // פונקציה להמרת גודל חבילה וסוג רכב מעברית לאנגלית
@@ -109,8 +122,17 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
     required_vehicle_type: mappedVehicleType,
     estimated_distance: '0 km', // יעודכן בהמשך
     estimated_duration: '0 min', // יעודכן בהמשך
+    accepted_time: dbDelivery.accepted_time,
+    pickup_time: dbDelivery.pickup_time,
+    delivery_time: dbDelivery.delivery_time,
     created_at: dbDelivery.createdAt || dbDelivery.created_date,
-    updated_at: dbDelivery.createdAt || dbDelivery.created_date,
+    updated_at: dbDelivery.updated_at || dbDelivery.createdAt || dbDelivery.created_date,
+    // ✅ Business identification (for batching)
+    business_name: dbDelivery.business_name,
+    business_email: dbDelivery.business_email,
+    // ✅ Coordinates (for batching and mapping)
+    delivery_coordinates: dbDelivery.delivery_coordinates,
+    pickup_coordinates: dbDelivery.pickup_coordinates,
   };
   
   console.log(`✅ [DeliveryService] Converted delivery:`, {
@@ -121,7 +143,12 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
     status: delivery.status,
     fullPrice: fullPrice,
     courierEarnings: courierEarnings,
-    commission: '15%'
+    commission: '15%',
+    business_name: delivery.business_name,
+    business_email: delivery.business_email,
+    has_delivery_coords: !!delivery.delivery_coordinates,
+    has_pickup_coords: !!delivery.pickup_coordinates,
+    delivery_coords: delivery.delivery_coordinates
   });
   
   return delivery;
@@ -284,6 +311,67 @@ export const getDeliveryById = async (deliveryId: string): Promise<Delivery | nu
   }
 };
 
+// פונקציה להקצאת batch של משלוחים לשליח (2 משלוחים ביחד)
+export const assignBatchToCourier = async (
+  deliveryIds: [string, string],
+  courierId: string
+): Promise<boolean> => {
+  try {
+    const db = getDatabase(app);
+    
+    console.log(`📦 [DeliveryService] Assigning batch of ${deliveryIds.length} deliveries to courier ${courierId}`);
+    
+    // עבור על כל משלוח בבטח
+    for (const deliveryId of deliveryIds) {
+      const deliveryRef = ref(db, `Deliveries/${deliveryId}`);
+      const deliverySnapshot = await get(deliveryRef);
+      
+      if (!deliverySnapshot.exists()) {
+        console.error(`❌ [DeliveryService] Delivery ${deliveryId} not found`);
+        return false;
+      }
+      
+      const deliveryData = deliverySnapshot.val();
+      
+      // בדוק שהמשלוח עדיין זמין
+      const availableStatuses = ['מוכן לאיסוף', 'מוכן', 'ready'];
+      if (!availableStatuses.includes(deliveryData.status)) {
+        console.error(`❌ [DeliveryService] Delivery ${deliveryId} is not available (status: ${deliveryData.status})`);
+        return false;
+      }
+      
+      // עדכן את הסטטוס ל-"מקבל" והוסף את מזהה השליח
+      await update(deliveryRef, {
+        status: 'מקבל',
+        assigned_courier: courierId,
+        accepted_time: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_batched: true, // סימון שזה חלק מבטח
+        batch_id: `batch_${deliveryIds[0]}_${deliveryIds[1]}`
+      });
+      
+      console.log(`✅ [DeliveryService] Updated delivery ${deliveryId} status to "מקבל" (batched)`);
+      
+      // הוסף את המשלוח לרשימת המשלוחים של השליח
+      const courierDeliveryRef = ref(db, `Couriers/${courierId}/CollectedDeliveries/${deliveryId}`);
+      await set(courierDeliveryRef, {
+        status: 'מקבל',
+        accepted_time: new Date().toISOString(),
+        is_batched: true,
+        batch_id: `batch_${deliveryIds[0]}_${deliveryIds[1]}`
+      });
+      
+      console.log(`✅ [DeliveryService] Added delivery ${deliveryId} to courier's CollectedDeliveries`);
+    }
+    
+    console.log(`✅ [DeliveryService] Successfully assigned batch to courier`);
+    return true;
+  } catch (error) {
+    console.error(`❌ [DeliveryService] Error assigning batch:`, error);
+    return false;
+  }
+};
+
 // פונקציה להקצאת משלוח לשליח
 export const assignDeliveryToCourier = async (
   deliveryId: string,
@@ -441,6 +529,11 @@ export const getCourierDeliveries = async (courierId: string): Promise<Delivery[
         } else if (dbDelivery.status === 'הגיע ליעד') {
           delivery.status = 'arrived_delivery';
         }
+        
+        // Ensure timestamps are preserved
+        if (dbDelivery.accepted_time) delivery.accepted_time = dbDelivery.accepted_time;
+        if (dbDelivery.pickup_time) delivery.pickup_time = dbDelivery.pickup_time;
+        if (dbDelivery.delivery_time) delivery.delivery_time = dbDelivery.delivery_time;
         
         deliveries.push(delivery);
       }

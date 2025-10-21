@@ -33,12 +33,15 @@ interface DBDelivery {
   pickup_time?: string;
   delivery_time?: string;
   createdAt: string;
+  is_batched?: boolean;
+  batch_id?: string;
 }
 
 export default function ActiveJob() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [delivery, setDelivery] = useState<Delivery | null>(null);
+  const [batchDelivery, setBatchDelivery] = useState<Delivery | null>(null); // Second delivery in batch
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -88,7 +91,7 @@ export default function ActiveJob() {
         
         // הרשם לעדכונים בזמן אמת של המשלוח עצמו
         const deliveryRef = ref(db, `Deliveries/${activeDeliveryId}`);
-        const deliveryUnsubscribe = onValue(deliveryRef, (deliverySnapshot) => {
+        const deliveryUnsubscribe = onValue(deliveryRef, async (deliverySnapshot) => {
           if (deliverySnapshot.exists()) {
             const dbDelivery = deliverySnapshot.val() as DBDelivery;
             const deliveryAddress = `${dbDelivery.delivery_street || ''}, ${dbDelivery.delivery_city || ''}`.trim();
@@ -119,9 +122,70 @@ export default function ActiveJob() {
             console.log(`✅ [ActiveJob] Loaded/Updated delivery:`, {
               id: mappedDelivery.id,
               status: mappedDelivery.status,
-              customer: mappedDelivery.customer_name
+              customer: mappedDelivery.customer_name,
+              is_batched: dbDelivery.is_batched,
+              batch_id: dbDelivery.batch_id
             });
             setDelivery(mappedDelivery);
+
+            // ✅ Check if this is a batched delivery and load the other delivery
+            if (dbDelivery.is_batched && dbDelivery.batch_id) {
+              console.log(`📦 [ActiveJob] This is a batched delivery, loading batch partner...`);
+              
+              // Find the other delivery in the batch
+              const allDeliveriesRef = ref(db, 'Deliveries');
+              const allDeliveriesSnapshot = await get(allDeliveriesRef);
+              
+              if (allDeliveriesSnapshot.exists()) {
+                const allDeliveries = allDeliveriesSnapshot.val();
+                
+                // Find the other delivery with the same batch_id but different id
+                for (const [deliveryId, deliveryData] of Object.entries(allDeliveries)) {
+                  const otherDelivery = deliveryData as DBDelivery;
+                  
+                  if (
+                    otherDelivery.batch_id === dbDelivery.batch_id &&
+                    deliveryId !== activeDeliveryId &&
+                    otherDelivery.is_batched
+                  ) {
+                    const otherDeliveryAddress = `${otherDelivery.delivery_street || ''}, ${otherDelivery.delivery_city || ''}`.trim();
+                    
+                    const mappedBatchDelivery: Delivery = {
+                      id: deliveryId,
+                      order_number: deliveryId.substring(0, 8).toUpperCase(),
+                      customer_name: otherDelivery.customer_name,
+                      customer_phone: otherDelivery.customer_phone,
+                      package_description: otherDelivery.package_description,
+                      pickup_address: otherDelivery.pickup_address,
+                      pickup_phone: otherDelivery.customer_phone,
+                      delivery_address: otherDeliveryAddress,
+                      delivery_notes: otherDelivery.delivery_notes || '',
+                      payment_amount: 0,
+                      status: mapStatusToEnglish(otherDelivery.status),
+                      required_vehicle_type: mapVehicleType(otherDelivery.vehicle_type),
+                      accepted_time: otherDelivery.accepted_time,
+                      pickup_time: otherDelivery.pickup_time,
+                      delivery_time: otherDelivery.delivery_time,
+                      estimated_distance: '0 km',
+                      estimated_duration: '0 min',
+                      created_at: otherDelivery.createdAt,
+                      updated_at: otherDelivery.createdAt,
+                    };
+                    
+                    console.log(`✅ [ActiveJob] Found batch partner:`, {
+                      id: mappedBatchDelivery.id,
+                      customer: mappedBatchDelivery.customer_name
+                    });
+                    
+                    setBatchDelivery(mappedBatchDelivery);
+                    break;
+                  }
+                }
+              }
+            } else {
+              // Not a batched delivery
+              setBatchDelivery(null);
+            }
           }
           
           setIsLoading(false);
@@ -289,6 +353,17 @@ export default function ActiveJob() {
       >
         <Card className="mb-4 border-2 border-blue-200">
           <CardContent className="p-4">
+            {batchDelivery && (
+              <div className="mb-3 bg-gradient-to-r from-purple-100 to-pink-100 border-2 border-purple-300 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge className="bg-purple-600 text-white hover:bg-purple-600">
+                    🎁 משלוח כפול
+                  </Badge>
+                  <span className="text-sm font-bold text-purple-900">2 משלוחים באותו אזור!</span>
+                </div>
+                <p className="text-xs text-purple-800">אסוף חבילה אחת ותמסור ל-2 לקוחות</p>
+              </div>
+            )}
             <div className="flex items-start justify-between mb-3">
               <div>
                 <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 mb-2">
@@ -362,44 +437,131 @@ export default function ActiveJob() {
             </CardContent>
           </Card>
 
-          {/* Delivery Location Card */}
-          <Card className={showDeliveryNav ? "border-2 border-green-300" : ""}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-green-600" />
+          {/* Delivery Location Card(s) */}
+          {batchDelivery ? (
+            <>
+              {/* First Delivery */}
+              <Card className={showDeliveryNav ? "border-2 border-green-300" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <div className="text-green-600 font-bold">1</div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-1">משלוח ראשון</h3>
+                      <p className="text-sm text-gray-600 mb-1">{delivery.customer_name}</p>
+                      <p className="text-gray-700 mb-2">{delivery.delivery_address}</p>
+                      <a href={`tel:${delivery.customer_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                        <Phone className="w-3 h-3" />
+                        {delivery.customer_phone}
+                      </a>
+                      <p className="text-xs text-gray-500 mt-1">📦 {delivery.package_description}</p>
+                    </div>
+                  </div>
+                  {showDeliveryNav && (
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <Button
+                        onClick={() => openWaze(delivery.delivery_address)}
+                        variant="outline"
+                        className="border-green-300 text-green-600 hover:bg-green-50"
+                      >
+                        <Navigation className="w-4 h-4 ml-2" />
+                        Waze
+                      </Button>
+                      <Button
+                        onClick={() => openGoogleMaps(delivery.delivery_address)}
+                        variant="outline"
+                        className="border-green-300 text-green-600 hover:bg-green-50"
+                      >
+                        <Navigation className="w-4 h-4 ml-2" />
+                        Google Maps
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Second Delivery */}
+              <Card className={showDeliveryNav ? "border-2 border-purple-300" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <div className="text-purple-600 font-bold">2</div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-1">משלוח שני</h3>
+                      <p className="text-sm text-gray-600 mb-1">{batchDelivery.customer_name}</p>
+                      <p className="text-gray-700 mb-2">{batchDelivery.delivery_address}</p>
+                      <a href={`tel:${batchDelivery.customer_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                        <Phone className="w-3 h-3" />
+                        {batchDelivery.customer_phone}
+                      </a>
+                      <p className="text-xs text-gray-500 mt-1">📦 {batchDelivery.package_description}</p>
+                    </div>
+                  </div>
+                  {showDeliveryNav && (
+                    <div className="grid grid-cols-2 gap-2 mt-3">
+                      <Button
+                        onClick={() => openWaze(batchDelivery.delivery_address)}
+                        variant="outline"
+                        className="border-purple-300 text-purple-600 hover:bg-purple-50"
+                      >
+                        <Navigation className="w-4 h-4 ml-2" />
+                        Waze
+                      </Button>
+                      <Button
+                        onClick={() => openGoogleMaps(batchDelivery.delivery_address)}
+                        variant="outline"
+                        className="border-purple-300 text-purple-600 hover:bg-purple-50"
+                      >
+                        <Navigation className="w-4 h-4 ml-2" />
+                        Google Maps
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            /* Single Delivery */
+            <Card className={showDeliveryNav ? "border-2 border-green-300" : ""}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">מיקום משלוח</h3>
+                    <p className="text-gray-700 mb-2">{delivery.delivery_address}</p>
+                    <a href={`tel:${delivery.customer_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                      <Phone className="w-3 h-3" />
+                      {delivery.customer_phone}
+                    </a>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">מיקום משלוח</h3>
-                  <p className="text-gray-700 mb-2">{delivery.delivery_address}</p>
-                  <a href={`tel:${delivery.customer_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
-                    <Phone className="w-3 h-3" />
-                    {delivery.customer_phone}
-                  </a>
-                </div>
-              </div>
-              {showDeliveryNav && (
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <Button
-                    onClick={() => openWaze(delivery.delivery_address)}
-                    variant="outline"
-                    className="border-green-300 text-green-600 hover:bg-green-50"
-                  >
-                    <Navigation className="w-4 h-4 ml-2" />
-                    Waze
-                  </Button>
-                <Button
-                    onClick={() => openGoogleMaps(delivery.delivery_address)}
-                  variant="outline"
-                    className="border-green-300 text-green-600 hover:bg-green-50"
-                >
-                    <Navigation className="w-4 h-4 ml-2" />
-                    Google Maps
-                </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {showDeliveryNav && (
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <Button
+                      onClick={() => openWaze(delivery.delivery_address)}
+                      variant="outline"
+                      className="border-green-300 text-green-600 hover:bg-green-50"
+                    >
+                      <Navigation className="w-4 h-4 ml-2" />
+                      Waze
+                    </Button>
+                    <Button
+                      onClick={() => openGoogleMaps(delivery.delivery_address)}
+                      variant="outline"
+                      className="border-green-300 text-green-600 hover:bg-green-50"
+                    >
+                      <Navigation className="w-4 h-4 ml-2" />
+                      Google Maps
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {delivery.delivery_notes && (
             <Card className="bg-amber-50 border-amber-200">
