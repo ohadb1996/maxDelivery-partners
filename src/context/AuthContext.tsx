@@ -156,6 +156,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           
           // התנתק מיד
           try {
+            const auth = getAuth(app);
             await firebaseSignOut(auth);
           } catch (logoutError) {
             console.error('[AuthContext] Logout error:', logoutError);
