@@ -143,17 +143,31 @@ export function findBatchableDeliveries(
   
   // Step 2: מצא Cross-Business Batches
   console.log(`🔄 [Cross-Business] Checking cross-business opportunities...`);
+  console.log(`🔄 [Cross-Business] Total deliveries to check: ${availableDeliveries.length}`);
   
   for (let i = 0; i < availableDeliveries.length; i++) {
     for (let j = i + 1; j < availableDeliveries.length; j++) {
       const delivery1 = availableDeliveries[i];
       const delivery2 = availableDeliveries[j];
       
+      console.log(`🔍 [Cross-Business] Checking pair: ${delivery1.id} + ${delivery2.id}`);
+      
       // Skip if same business (already handled above)
       const business1 = delivery1.business_email || delivery1.business_name;
       const business2 = delivery2.business_email || delivery2.business_name;
       
-      if (business1 === business2) continue;
+      console.log(`   📊 Business check:`, {
+        delivery1_id: delivery1.id,
+        business1: business1 || 'UNDEFINED',
+        delivery2_id: delivery2.id,
+        business2: business2 || 'UNDEFINED',
+        sameBusiness: business1 === business2
+      });
+      
+      if (business1 === business2) {
+        console.log(`   ⏭️ SKIPPED: Same business (${business1 || 'both undefined'})`);
+        continue;
+      }
       
       // Check all required coordinates
       const pickupCoords1 = delivery1.pickup_coordinates;
@@ -161,7 +175,15 @@ export function findBatchableDeliveries(
       const dropoffCoords1 = delivery1.delivery_coordinates;
       const dropoffCoords2 = delivery2.delivery_coordinates;
       
+      console.log(`   📍 Coordinate check:`, {
+        delivery1_pickup: pickupCoords1 ? `✓ (${pickupCoords1.lat}, ${pickupCoords1.lng})` : '✗ MISSING',
+        delivery1_dropoff: dropoffCoords1 ? `✓ (${dropoffCoords1.lat}, ${dropoffCoords1.lng})` : '✗ MISSING',
+        delivery2_pickup: pickupCoords2 ? `✓ (${pickupCoords2.lat}, ${pickupCoords2.lng})` : '✗ MISSING',
+        delivery2_dropoff: dropoffCoords2 ? `✓ (${dropoffCoords2.lat}, ${dropoffCoords2.lng})` : '✗ MISSING'
+      });
+      
       if (!pickupCoords1 || !pickupCoords2 || !dropoffCoords1 || !dropoffCoords2) {
+        console.log(`   ⏭️ SKIPPED: Missing coordinates`);
         continue;
       }
       
@@ -173,7 +195,12 @@ export function findBatchableDeliveries(
         pickupCoords2.lng
       );
       
-      if (pickupDistance > maxPickupDistanceKm) continue;
+      console.log(`   📏 Pickup distance: ${pickupDistance.toFixed(3)} km (max: ${maxPickupDistanceKm} km) - ${pickupDistance <= maxPickupDistanceKm ? '✓ PASS' : '✗ FAIL'}`);
+      
+      if (pickupDistance > maxPickupDistanceKm) {
+        console.log(`   ⏭️ SKIPPED: Pickup distance too far (${pickupDistance.toFixed(3)} km > ${maxPickupDistanceKm} km)`);
+        continue;
+      }
       
       // Check dropoff distance (must be <= 2.0 km)
       const dropoffDistance = calculateDistance(
@@ -183,16 +210,28 @@ export function findBatchableDeliveries(
         dropoffCoords2.lng
       );
       
-      if (dropoffDistance > maxDropoffDistanceKm) continue;
+      console.log(`   📏 Dropoff distance: ${dropoffDistance.toFixed(3)} km (max: ${maxDropoffDistanceKm} km) - ${dropoffDistance <= maxDropoffDistanceKm ? '✓ PASS' : '✗ FAIL'}`);
+      
+      if (dropoffDistance > maxDropoffDistanceKm) {
+        console.log(`   ⏭️ SKIPPED: Dropoff distance too far (${dropoffDistance.toFixed(3)} km > ${maxDropoffDistanceKm} km)`);
+        continue;
+      }
       
       // Check time difference (must be < 10 minutes)
       const time1 = new Date(delivery1.created_at).getTime();
       const time2 = new Date(delivery2.created_at).getTime();
       const timeDiffMinutes = Math.abs(time1 - time2) / (1000 * 60);
       
-      if (timeDiffMinutes >= maxTimeDiffMinutes) continue;
+      console.log(`   ⏰ Time difference: ${timeDiffMinutes.toFixed(1)} minutes (max: ${maxTimeDiffMinutes} min) - ${timeDiffMinutes < maxTimeDiffMinutes ? '✓ PASS' : '✗ FAIL'}`);
+      
+      if (timeDiffMinutes >= maxTimeDiffMinutes) {
+        console.log(`   ⏭️ SKIPPED: Time difference too large (${timeDiffMinutes.toFixed(1)} min >= ${maxTimeDiffMinutes} min)`);
+        continue;
+      }
       
       // Valid cross-business pair!
+      console.log(`   ✅✅✅ ALL CHECKS PASSED! Creating cross-business pair candidate ✅✅✅`);
+      
       allValidPairs.push({
         delivery1,
         delivery2,
@@ -202,7 +241,7 @@ export function findBatchableDeliveries(
         type: 'cross_business'
       });
       
-      console.log(`✅ [Cross-Business] Valid pair: ${delivery1.id} (${business1}) + ${delivery2.id} (${business2})`, {
+      console.log(`✅ [Cross-Business] Valid pair added: ${delivery1.id} (${business1}) + ${delivery2.id} (${business2})`, {
         pickupDist: `${pickupDistance.toFixed(2)} km`,
         dropoffDist: `${dropoffDistance.toFixed(2)} km`,
         timeDiff: `${timeDiffMinutes.toFixed(1)} min`
@@ -210,7 +249,13 @@ export function findBatchableDeliveries(
     }
   }
   
-  console.log(`📊 [Batching] Found ${allValidPairs.length} total valid pairs (single-business + cross-business)`);
+  const crossBusinessPairs = allValidPairs.filter(p => p.type === 'cross_business').length;
+  const singleBusinessPairs = allValidPairs.filter(p => p.type === 'single_business').length;
+  
+  console.log(`📊 [Batching] Found ${allValidPairs.length} total valid pairs:`, {
+    singleBusiness: singleBusinessPairs,
+    crossBusiness: crossBusinessPairs
+  });
   
   // Step 3: Sort all pairs by priority (shortest distance first, prefer single-business)
   allValidPairs.sort((a, b) => {

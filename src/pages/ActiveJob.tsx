@@ -198,11 +198,21 @@ export default function ActiveJob() {
                 updated_at: otherDelivery.createdAt,
               };
               
+              // ✅ Check if this is a cross-business batch
+              const business1 = dbDelivery.business_email || dbDelivery.business_name;
+              const business2 = otherDelivery.business_email || otherDelivery.business_name;
+              const isCrossBusiness = business1 !== business2;
+              
               console.log(`✅ [ActiveJob] Found batch partner:`, {
                 id: mappedBatchDelivery.id,
-                customer: mappedBatchDelivery.customer_name
+                customer: mappedBatchDelivery.customer_name,
+                business1,
+                business2,
+                isCrossBusiness
               });
               
+              // Store the batch delivery with cross-business flag
+              (mappedBatchDelivery as any)._isCrossBusiness = isCrossBusiness;
               setBatchDelivery(mappedBatchDelivery);
             }
           });
@@ -373,14 +383,38 @@ export default function ActiveJob() {
         <Card className="mb-4 border-2 border-blue-200">
           <CardContent className="p-4">
             {batchDelivery && (
-              <div className="mb-3 bg-gradient-to-r from-purple-100 to-pink-100 border-2 border-purple-300 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge className="bg-purple-600 text-white hover:bg-purple-600">
+              <div className={`mb-3 border-2 rounded-lg p-3 ${
+                (batchDelivery as any)._isCrossBusiness 
+                  ? 'bg-gradient-to-r from-orange-100 to-yellow-100 border-orange-400'
+                  : 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-300'
+              }`}>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <Badge className={`text-white hover:bg-opacity-90 ${
+                    (batchDelivery as any)._isCrossBusiness 
+                      ? 'bg-orange-600 hover:bg-orange-600' 
+                      : 'bg-purple-600 hover:bg-purple-600'
+                  }`}>
                     🎁 משלוח כפול
                   </Badge>
-                  <span className="text-sm font-bold text-purple-900">2 משלוחים באותו אזור!</span>
+                  {(batchDelivery as any)._isCrossBusiness && (
+                    <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white animate-pulse">
+                      🏪🏪 משני עסקים שונים!
+                    </Badge>
+                  )}
+                  <span className={`text-sm font-bold ${
+                    (batchDelivery as any)._isCrossBusiness ? 'text-orange-900' : 'text-purple-900'
+                  }`}>
+                    2 משלוחים באותו אזור!
+                  </span>
                 </div>
-                <p className="text-xs text-purple-800">אסוף חבילה אחת ותמסור ל-2 לקוחות</p>
+                <p className={`text-xs ${
+                  (batchDelivery as any)._isCrossBusiness ? 'text-orange-800' : 'text-purple-800'
+                }`}>
+                  {(batchDelivery as any)._isCrossBusiness 
+                    ? 'אסוף מ-2 עסקים שונים ותמסור ל-2 לקוחות - הכנסה כפולה! 💰'
+                    : 'אסוף חבילה אחת ותמסור ל-2 לקוחות'
+                  }
+                </p>
               </div>
             )}
             <div className="flex items-start justify-between mb-3">
@@ -418,21 +452,70 @@ export default function ActiveJob() {
           {/* Pickup Location Card */}
           <Card className={showPickupNav ? "border-2 border-blue-300" : ""}>
             <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Package className="w-5 h-5 text-blue-600" />
+              {batchDelivery && (batchDelivery as any)._isCrossBusiness ? (
+                // Cross-business batch: Show both pickup addresses
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-orange-600" />
+                    נקודות איסוף (2 עסקים)
+                  </h3>
+                  
+                  {/* Pickup 1 */}
+                  <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">
+                        1
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-orange-900 mb-1">🏪 עסק ראשון</p>
+                        <p className="text-gray-700 text-sm mb-2">{delivery.pickup_address}</p>
+                        {delivery.pickup_phone && (
+                          <a href={`tel:${delivery.pickup_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                            <Phone className="w-3 h-3" />
+                            {delivery.pickup_phone}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Pickup 2 */}
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-yellow-600 text-white rounded-full flex items-center justify-center flex-shrink-0 font-bold">
+                        2
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-yellow-900 mb-1">🏪 עסק שני</p>
+                        <p className="text-gray-700 text-sm mb-2">{batchDelivery.pickup_address}</p>
+                        {batchDelivery.pickup_phone && (
+                          <a href={`tel:${batchDelivery.pickup_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                            <Phone className="w-3 h-3" />
+                            {batchDelivery.pickup_phone}
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">מיקום איסוף</h3>
-                  <p className="text-gray-700 mb-2">{delivery.pickup_address}</p>
-                  {delivery.pickup_phone && (
-                    <a href={`tel:${delivery.pickup_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
-                      <Phone className="w-3 h-3" />
-                      {delivery.pickup_phone}
-                    </a>
-                  )}
+              ) : (
+                // Regular delivery or single-business batch
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Package className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">מיקום איסוף</h3>
+                    <p className="text-gray-700 mb-2">{delivery.pickup_address}</p>
+                    {delivery.pickup_phone && (
+                      <a href={`tel:${delivery.pickup_phone}`} className="flex items-center gap-1 text-sm text-blue-600">
+                        <Phone className="w-3 h-3" />
+                        {delivery.pickup_phone}
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
               {showPickupNav && (
                 <div className="grid grid-cols-2 gap-2 mt-3">
                   <Button

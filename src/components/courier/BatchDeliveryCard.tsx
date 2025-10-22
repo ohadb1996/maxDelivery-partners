@@ -12,25 +12,52 @@ interface BatchDeliveryCardProps {
 
 export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchDeliveryCardProps) {
   const [delivery1, delivery2] = batch.deliveries;
+  const isCrossBusiness = batch.type === 'cross_business';
 
   return (
-    <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50 shadow-lg hover:shadow-xl transition-shadow">
+    <Card className={`border-2 shadow-lg hover:shadow-xl transition-shadow ${
+      isCrossBusiness 
+        ? 'border-orange-400 bg-gradient-to-br from-orange-50 to-yellow-50'
+        : 'border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50'
+    }`}>
       <CardContent className="p-4">
         {/* Header - Batch Badge */}
         <div className="flex items-center justify-between mb-3">
-          <Badge className="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1">
-            <Package className="w-3 h-3 mr-1" />
-            משלוח כפול (BATCH)
-          </Badge>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={`text-white px-3 py-1 ${
+              isCrossBusiness 
+                ? 'bg-orange-600 hover:bg-orange-700'
+                : 'bg-purple-600 hover:bg-purple-700'
+            }`}>
+              <Package className="w-3 h-3 mr-1" />
+              משלוח כפול
+            </Badge>
+            {isCrossBusiness && (
+              <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white animate-pulse">
+                🏪🏪 2 עסקים!
+              </Badge>
+            )}
+          </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-purple-700">₪{batch.total_earnings}</p>
+            <p className={`text-2xl font-bold ${
+              isCrossBusiness ? 'text-orange-700' : 'text-purple-700'
+            }`}>₪{batch.total_earnings}</p>
             <p className="text-xs text-gray-600">הכנסה כוללת</p>
           </div>
         </div>
 
         {/* Business Name */}
-        <div className="bg-white/80 rounded-lg p-2 mb-3">
-          <p className="text-sm font-semibold text-gray-700">🏪 {batch.business_name}</p>
+        <div className={`rounded-lg p-2 mb-3 ${
+          isCrossBusiness ? 'bg-orange-100/80' : 'bg-white/80'
+        }`}>
+          <p className="text-sm font-semibold text-gray-700">
+            🏪 {batch.business_name}
+          </p>
+          {isCrossBusiness && (
+            <p className="text-xs text-orange-700 font-medium mt-1">
+              💰 הכנסה כפולה ממשני עסקים שונים!
+            </p>
+          )}
         </div>
 
         {/* Delivery 1 */}
@@ -58,10 +85,19 @@ export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchD
 
         {/* Distance Between Arrow */}
         <div className="flex items-center justify-center my-2">
-          <div className="flex items-center gap-2 bg-purple-100 px-3 py-1 rounded-full">
-            <Navigation2 className="w-4 h-4 text-purple-600" />
-            <span className="text-sm font-semibold text-purple-700">
-              {batch.distance_between_dropoffs} ק"מ ביניהם
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+            isCrossBusiness ? 'bg-orange-100' : 'bg-purple-100'
+          }`}>
+            <Navigation2 className={`w-4 h-4 ${
+              isCrossBusiness ? 'text-orange-600' : 'text-purple-600'
+            }`} />
+            <span className={`text-sm font-semibold ${
+              isCrossBusiness ? 'text-orange-700' : 'text-purple-700'
+            }`}>
+              {isCrossBusiness && batch.distance_between_pickups && (
+                <span className="ml-1">📍 איסוף: {batch.distance_between_pickups.toFixed(2)} ק"מ • </span>
+              )}
+              📦 {batch.distance_between_dropoffs.toFixed(2)} ק"מ ביניהם
             </span>
           </div>
         </div>
@@ -93,7 +129,11 @@ export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchD
         <Button
           onClick={() => onAccept(batch)}
           disabled={isLoading}
-          className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-6 text-lg shadow-md"
+          className={`w-full text-white font-semibold py-6 text-lg shadow-md ${
+            isCrossBusiness
+              ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
+              : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+          }`}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
@@ -103,7 +143,10 @@ export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchD
           ) : (
             <span className="flex items-center gap-2">
               <Package className="w-5 h-5" />
-              קבל 2 משלוחים ביחד (₪{batch.total_earnings})
+              {isCrossBusiness 
+                ? `קבל 2 משלוחים מ-2 עסקים (₪${batch.total_earnings})` 
+                : `קבל 2 משלוחים ביחד (₪${batch.total_earnings})`
+              }
             </span>
           )}
         </Button>
