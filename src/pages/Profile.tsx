@@ -3,17 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { User2, Phone, Mail, DollarSign, Package, TrendingUp, Bike, Car, Truck, Settings, X } from "lucide-react";
+import { User2, Phone, Mail, Bike, Car, Truck, Settings, X, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { VehicleType } from "@/types";
-import { 
-  getCurrentMonthStats, 
-  getDailyStatsForMonth,
-  getMonthlyStats
-} from "@/services/deliveryService";
-import MonthlyDeliveriesChart from "@/components/courier/MonthlyDeliveriesChart";
-import MonthSelector from "@/components/courier/MonthSelector";
-import MonthlyStatsCard from "@/components/courier/MonthlyStatsCard";
 import { updateEmail, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth, db } from "@/api/config/firebase.config";
 import { ref as dbRef, update } from "firebase/database";
@@ -22,7 +14,6 @@ import { validatePhoneNumber } from "@/api/utils/phoneValidity";
 export default function Profile() {
   const { user, updateVehicleType } = useAuth();
   const [courier, setCourier] = useState<any>(null);
-  const [stats, setStats] = useState({ total: 0, thisWeek: 0, totalEarnings: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isEditingVehicle, setIsEditingVehicle] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('bike');
@@ -31,28 +22,17 @@ export default function Profile() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editedPhone, setEditedPhone] = useState('');
   const [editedEmail, setEditedEmail] = useState('');
+  const [editedBankName, setEditedBankName] = useState('');
+  const [editedBankAccount, setEditedBankAccount] = useState('');
+  const [editedBankBranch, setEditedBankBranch] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [phoneError, setPhoneError] = useState('');
-  
-  // מצבים לגרפים
-  const [, setCurrentMonthData] = useState<any>(null);
-  const [, setCurrentMonthStats] = useState<any>(null);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedMonthData, setSelectedMonthData] = useState<any>(null);
-  const [selectedMonthStats, setSelectedMonthStats] = useState<any>(null);
 
   useEffect(() => {
     loadProfile();
   }, []);
-
-  useEffect(() => {
-    if (user?.uid) {
-      loadMonthlyData();
-    }
-  }, [user, selectedYear, selectedMonth]);
 
   const loadProfile = async () => {
     try {
@@ -67,98 +47,20 @@ export default function Profile() {
         id: user.uid,
         business_email: user.email,
         phone: user.phone || "",
-        vehicle_type: user.vehicle_type || 'motorcycle', // שימוש ברמת התחבורה האמיתית
+        vehicle_type: user.vehicle_type || 'motorcycle',
         is_available: user.isAvailable || false,
-        rating: 4.8, // זה יבוא מהמשלוחים בפועל
+        bank_name: user.bank_name || "",
+        bank_account: user.bank_account || "",
+        bank_branch: user.bank_branch || "",
         created_at: user.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
       setCourier(courierData);
-      
-      // טעינת נתונים סטטיסטיים אמיתיים
-      await loadStatistics(user.uid);
     } catch (error) {
       console.error("Error loading profile:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const loadStatistics = async (courierId: string) => {
-    try {
-      console.log(`📊 [Profile] Loading statistics for courier: ${courierId}`);
-      
-      // קבלת כל הסטטיסטיקות החודשיות
-      const allMonthsStats = await getMonthlyStats(courierId);
-      console.log(`📊 [Profile] Found ${allMonthsStats.length} months with deliveries`);
-      
-      // חישוב סה"כ משלוחים
-      const total = allMonthsStats.reduce((sum, month) => sum + month.deliveryCount, 0);
-      console.log(`📊 [Profile] Total deliveries: ${total}`);
-      
-      // חישוב משלוחים השבוע
-      const now = new Date();
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const currentMonthStat = allMonthsStats.find(m => m.month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-      const thisWeekDeliveries = currentMonthStat?.deliveries.filter(d => {
-        const dateString = d.delivery_time || d.created_at || d.updated_at;
-        if (!dateString) return false;
-        
-        const deliveryDate = new Date(dateString);
-        return deliveryDate >= weekAgo;
-      }).length || 0;
-      
-      console.log(`📊 [Profile] This week deliveries: ${thisWeekDeliveries}`);
-      
-      // חישוב סה"כ הכנסות
-      const totalEarnings = allMonthsStats.reduce((sum, month) => sum + month.totalEarnings, 0);
-      console.log(`📊 [Profile] Total earnings: ₪${totalEarnings}`);
-      
-      setStats({
-        total,
-        thisWeek: thisWeekDeliveries,
-        totalEarnings
-      });
-    } catch (error) {
-      console.error("Error loading statistics:", error);
-      setStats({ total: 0, thisWeek: 0, totalEarnings: 0 });
-    }
-  };
-
-  const loadMonthlyData = async () => {
-    if (!user?.uid) return;
-
-    try {
-      console.log(`📊 [Profile] Loading monthly data for courier: ${user.uid}`);
-      
-      // טעינת נתוני החודש הנוכחי
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth();
-      
-      console.log(`📊 [Profile] Loading current month: ${currentYear}-${currentMonth + 1}`);
-      const currentStats = await getCurrentMonthStats(user.uid);
-      const currentDaily = await getDailyStatsForMonth(user.uid, currentYear, currentMonth);
-      
-      console.log(`📊 [Profile] Current month stats:`, currentStats);
-      console.log(`📊 [Profile] Current daily data:`, currentDaily);
-      
-      setCurrentMonthStats(currentStats);
-      setCurrentMonthData(currentDaily);
-
-      // טעינת נתוני החודש הנבחר
-      console.log(`📊 [Profile] Loading selected month: ${selectedYear}-${selectedMonth + 1}`);
-      const selectedStats = await getMonthlyStats(user.uid, selectedYear, selectedMonth);
-      const selectedDaily = await getDailyStatsForMonth(user.uid, selectedYear, selectedMonth);
-      
-      console.log(`📊 [Profile] Selected month stats:`, selectedStats);
-      console.log(`📊 [Profile] Selected daily data:`, selectedDaily);
-      
-      setSelectedMonthStats(selectedStats.length > 0 ? selectedStats[0] : null);
-      setSelectedMonthData(selectedDaily);
-    } catch (error) {
-      console.error("Error loading monthly data:", error);
     }
   };
 
@@ -204,6 +106,9 @@ export default function Profile() {
     const phoneWithoutPrefix = user?.phone ? user.phone.replace(/^\+972/, '') : '';
     setEditedPhone(phoneWithoutPrefix);
     setEditedEmail(user?.email || '');
+    setEditedBankName(courier?.bank_name || '');
+    setEditedBankAccount(courier?.bank_account || '');
+    setEditedBankBranch(courier?.bank_branch || '');
     setPhoneError('');
     setIsEditingProfile(true);
   };
@@ -212,6 +117,9 @@ export default function Profile() {
     setIsEditingProfile(false);
     setEditedPhone('');
     setEditedEmail('');
+    setEditedBankName('');
+    setEditedBankAccount('');
+    setEditedBankBranch('');
     setCurrentPassword('');
     setShowPasswordPrompt(false);
     setPhoneError('');
@@ -277,6 +185,22 @@ export default function Profile() {
         const fullPhone = `+972${editedPhone}`;
         await update(dbRef(db, `Couriers/${user.uid}`), { phone: fullPhone });
         console.log('✅ [Profile] Phone updated successfully');
+      }
+
+      // עדכון פרטי בנק
+      const bankChanged = 
+        editedBankName !== courier?.bank_name ||
+        editedBankAccount !== courier?.bank_account ||
+        editedBankBranch !== courier?.bank_branch;
+
+      if (bankChanged) {
+        console.log('🏦 [Profile] Updating bank details');
+        await update(dbRef(db, `Couriers/${user.uid}`), {
+          bank_name: editedBankName,
+          bank_account: editedBankAccount,
+          bank_branch: editedBankBranch
+        });
+        console.log('✅ [Profile] Bank details updated successfully');
       }
 
       // הצלחה!
@@ -425,6 +349,57 @@ export default function Profile() {
                   )}
                 </div>
 
+                <div className="pt-3 border-t">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3 text-right flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    פרטי חשבון בנק
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+                        שם הבנק
+                      </label>
+                      <Input
+                        type="text"
+                        value={editedBankName}
+                        onChange={(e) => setEditedBankName(e.target.value)}
+                        placeholder="לאומי, הפועלים, דיסקונט..."
+                        className="text-right"
+                        dir="rtl"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+                        מספר סניף
+                      </label>
+                      <Input
+                        type="text"
+                        value={editedBankBranch}
+                        onChange={(e) => setEditedBankBranch(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="123"
+                        className="text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+                        מספר חשבון
+                      </label>
+                      <Input
+                        type="text"
+                        value={editedBankAccount}
+                        onChange={(e) => setEditedBankAccount(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="123456"
+                        className="text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {showPasswordPrompt && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
                     <p className="text-sm text-yellow-800 text-right font-medium">
@@ -515,6 +490,36 @@ export default function Profile() {
                   )}
                 </div>
               </div>
+
+              {/* Bank Account Details Display */}
+              {(courier?.bank_name || courier?.bank_account || courier?.bank_branch) && (
+                <div className="pt-4 mt-4 border-t">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3 text-right flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    פרטי חשבון בנק
+                  </h4>
+                  <div className="space-y-2 text-right">
+                    {courier?.bank_name && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-900 font-medium">{courier.bank_name}</span>
+                        <span className="text-xs text-gray-500">שם הבנק:</span>
+                      </div>
+                    )}
+                    {courier?.bank_branch && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-900 font-medium" dir="ltr">{courier.bank_branch}</span>
+                        <span className="text-xs text-gray-500">מספר סניף:</span>
+                      </div>
+                    )}
+                    {courier?.bank_account && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-900 font-medium" dir="ltr">{courier.bank_account}</span>
+                        <span className="text-xs text-gray-500">מספר חשבון:</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -583,88 +588,6 @@ export default function Profile() {
                   </Button>
                 </>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {stats.total === 0 ? (
-        <Card className="mb-6 border-2 border-dashed border-gray-300">
-          <CardContent className="p-8 text-center">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">עדיין אין משלוחים</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              כשתקבל משלוחים ותמסור אותם, הסטטיסטיקות יופיעו כאן
-            </p>
-            <div className="text-xs text-gray-400">
-              🚀 צא לדרך ותתחיל לעבוד!
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Package className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-xs text-gray-500">סה"כ</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-6 h-6 text-green-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{stats.thisWeek}</p>
-              <p className="text-xs text-gray-500">השבוע</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4 text-center">
-              <DollarSign className="w-6 h-6 text-green-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">₪{stats.totalEarnings.toFixed(0)}</p>
-              <p className="text-xs text-gray-500">הכנסות</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-     
-      {/* בורר חודש וגרף חודש נבחר */}
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-right">
-            סטטיסטיקות לפי חודש
-          </h3>
-          
-          <MonthSelector
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            onMonthChange={(year, month) => {
-              setSelectedYear(year);
-              setSelectedMonth(month);
-            }}
-          />
-
-          {selectedMonthStats && selectedMonthData && (
-            <div className="mt-6 space-y-6">
-              <MonthlyStatsCard
-                deliveryCount={selectedMonthStats.deliveryCount}
-                totalEarnings={selectedMonthStats.totalEarnings}
-                monthName={selectedMonthStats.monthName}
-              />
-              <MonthlyDeliveriesChart
-                data={selectedMonthData}
-                title={`משלוחים ב${selectedMonthStats.monthName}`}
-              />
-            </div>
-          )}
-
-          {(!selectedMonthStats || selectedMonthStats.deliveryCount === 0) && (
-            <div className="mt-6 text-center py-8">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-semibold text-gray-600 mb-2">אין משלוחים בחודש זה</h4>
-              <p className="text-gray-500 text-sm">נסה לבחור חודש אחר או חכה למשלוחים נוספים</p>
             </div>
           )}
         </CardContent>

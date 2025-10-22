@@ -58,30 +58,64 @@ export default function ActiveJob() {
     try {
       console.log(`📦 [ActiveJob] Loading active delivery for courier ${user.uid}`);
       
-      // שלוף את רשימת המשלוחים של השליח
-      const collectedRef = ref(db, `Couriers/${user.uid}/CollectedDeliveries`);
+      // Query the main Deliveries collection for deliveries assigned to this courier
+      const deliveriesRef = ref(db, 'Deliveries');
       
       // הרשם לעדכונים בזמן אמת
-      const unsubscribe = onValue(collectedRef, async (snapshot) => {
+      const unsubscribe = onValue(deliveriesRef, async (snapshot) => {
         if (!snapshot.exists()) {
-          console.log('📦 [ActiveJob] No collected deliveries');
+          console.log('📦 [ActiveJob] No deliveries in database');
           setDelivery(null);
           setIsLoading(false);
           return;
         }
         
-        // מצא משלוח פעיל (לא הושלם)
+        // Find active delivery assigned to this courier
         let activeDeliveryId: string | null = null;
+        let activeDeliveryData: DBDelivery | null = null;
+        
+        console.log('📦 [ActiveJob] Scanning all deliveries for courier assignments...');
+        
+        // Statuses that mean the delivery is active (accepted but not completed)
+        const activeStatuses = ['מקבל', 'הגיע לנקודת איסוף', 'נאסף', 'הגיע ליעד'];
         
         snapshot.forEach((childSnapshot) => {
-          const deliveryData = childSnapshot.val();
-          if (deliveryData.status && deliveryData.status !== 'הושלם' && deliveryData.status !== 'בוטל') {
-            activeDeliveryId = childSnapshot.key!;
+          const deliveryData = childSnapshot.val() as DBDelivery;
+          const deliveryId = childSnapshot.key!;
+          
+          // STRICT CHECKS: Delivery must be EXPLICITLY assigned to this courier AND have accepted status
+          const hasAssignedCourier = deliveryData.assigned_courier !== undefined && deliveryData.assigned_courier !== null;
+          const isAssignedToMe = hasAssignedCourier && deliveryData.assigned_courier === user.uid;
+          const isActiveStatus = deliveryData.status && activeStatuses.includes(deliveryData.status);
+          const hasAcceptedTime = deliveryData.accepted_time !== undefined && deliveryData.accepted_time !== null;
+          
+          console.log(`📦 [ActiveJob] Checking delivery ${deliveryId}:`, {
+            status: deliveryData.status,
+            assigned_courier: deliveryData.assigned_courier || 'NONE',
+            currentCourier: user.uid,
+            hasAssignedCourier,
+            isAssignedToMe,
+            isActiveStatus,
+            hasAcceptedTime,
+            accepted_time: deliveryData.accepted_time || 'NONE'
+          });
+          
+          // MUST meet ALL conditions:
+          // 1. Has assigned_courier field
+          // 2. assigned_courier matches current user
+          // 3. Has active status (מקבל, etc.)
+          // 4. Has accepted_time (proof it was accepted)
+          if (hasAssignedCourier && isAssignedToMe && isActiveStatus && hasAcceptedTime) {
+            console.log(`✅ [ActiveJob] Found valid active delivery: ${deliveryId}`);
+            activeDeliveryId = deliveryId;
+            activeDeliveryData = deliveryData;
+          } else {
+            console.log(`❌ [ActiveJob] Skipping delivery ${deliveryId} - not assigned or accepted by this courier`);
           }
         });
         
-        if (!activeDeliveryId) {
-          console.log('📦 [ActiveJob] No active delivery found');
+        if (!activeDeliveryId || !activeDeliveryData) {
+          console.log('📦 [ActiveJob] No active delivery found for this courier');
           setDelivery(null);
           setIsLoading(false);
           return;
@@ -89,110 +123,94 @@ export default function ActiveJob() {
         
         console.log(`📦 [ActiveJob] Found active delivery: ${activeDeliveryId}`);
         
-        // הרשם לעדכונים בזמן אמת של המשלוח עצמו
-        const deliveryRef = ref(db, `Deliveries/${activeDeliveryId}`);
-        const deliveryUnsubscribe = onValue(deliveryRef, async (deliverySnapshot) => {
-          if (deliverySnapshot.exists()) {
-            const dbDelivery = deliverySnapshot.val() as DBDelivery;
-            const deliveryAddress = `${dbDelivery.delivery_street || ''}, ${dbDelivery.delivery_city || ''}`.trim();
-            
-            // המר ל-Delivery
-            const mappedDelivery: Delivery = {
-              id: activeDeliveryId!,
-              order_number: activeDeliveryId!.substring(0, 8).toUpperCase(),
-              customer_name: dbDelivery.customer_name,
-              customer_phone: dbDelivery.customer_phone,
-              package_description: dbDelivery.package_description,
-              pickup_address: dbDelivery.pickup_address,
-              pickup_phone: dbDelivery.customer_phone,
-              delivery_address: deliveryAddress,
-              delivery_notes: dbDelivery.delivery_notes || '',
-              payment_amount: 0,
-              status: mapStatusToEnglish(dbDelivery.status),
-              required_vehicle_type: mapVehicleType(dbDelivery.vehicle_type),
-              accepted_time: dbDelivery.accepted_time,
-              pickup_time: dbDelivery.pickup_time,
-              delivery_time: dbDelivery.delivery_time,
-              estimated_distance: '0 km',
-              estimated_duration: '0 min',
-              created_at: dbDelivery.createdAt,
-              updated_at: dbDelivery.createdAt,
-            };
-            
-            console.log(`✅ [ActiveJob] Loaded/Updated delivery:`, {
-              id: mappedDelivery.id,
-              status: mappedDelivery.status,
-              customer: mappedDelivery.customer_name,
-              is_batched: dbDelivery.is_batched,
-              batch_id: dbDelivery.batch_id
-            });
-            setDelivery(mappedDelivery);
-
-            // ✅ Check if this is a batched delivery and load the other delivery
-            if (dbDelivery.is_batched && dbDelivery.batch_id) {
-              console.log(`📦 [ActiveJob] This is a batched delivery, loading batch partner...`);
-              
-              // Find the other delivery in the batch
-              const allDeliveriesRef = ref(db, 'Deliveries');
-              const allDeliveriesSnapshot = await get(allDeliveriesRef);
-              
-              if (allDeliveriesSnapshot.exists()) {
-                const allDeliveries = allDeliveriesSnapshot.val();
-                
-                // Find the other delivery with the same batch_id but different id
-                for (const [deliveryId, deliveryData] of Object.entries(allDeliveries)) {
-                  const otherDelivery = deliveryData as DBDelivery;
-                  
-                  if (
-                    otherDelivery.batch_id === dbDelivery.batch_id &&
-                    deliveryId !== activeDeliveryId &&
-                    otherDelivery.is_batched
-                  ) {
-                    const otherDeliveryAddress = `${otherDelivery.delivery_street || ''}, ${otherDelivery.delivery_city || ''}`.trim();
-                    
-                    const mappedBatchDelivery: Delivery = {
-                      id: deliveryId,
-                      order_number: deliveryId.substring(0, 8).toUpperCase(),
-                      customer_name: otherDelivery.customer_name,
-                      customer_phone: otherDelivery.customer_phone,
-                      package_description: otherDelivery.package_description,
-                      pickup_address: otherDelivery.pickup_address,
-                      pickup_phone: otherDelivery.customer_phone,
-                      delivery_address: otherDeliveryAddress,
-                      delivery_notes: otherDelivery.delivery_notes || '',
-                      payment_amount: 0,
-                      status: mapStatusToEnglish(otherDelivery.status),
-                      required_vehicle_type: mapVehicleType(otherDelivery.vehicle_type),
-                      accepted_time: otherDelivery.accepted_time,
-                      pickup_time: otherDelivery.pickup_time,
-                      delivery_time: otherDelivery.delivery_time,
-                      estimated_distance: '0 km',
-                      estimated_duration: '0 min',
-                      created_at: otherDelivery.createdAt,
-                      updated_at: otherDelivery.createdAt,
-                    };
-                    
-                    console.log(`✅ [ActiveJob] Found batch partner:`, {
-                      id: mappedBatchDelivery.id,
-                      customer: mappedBatchDelivery.customer_name
-                    });
-                    
-                    setBatchDelivery(mappedBatchDelivery);
-                    break;
-                  }
-                }
-              }
-            } else {
-              // Not a batched delivery
-              setBatchDelivery(null);
-            }
-          }
-          
-          setIsLoading(false);
-        });
+        // Use the delivery data we already have
+        const dbDelivery = activeDeliveryData;
+        const deliveryAddress = `${dbDelivery.delivery_street || ''}, ${dbDelivery.delivery_city || ''}`.trim();
         
-        // החזר unsubscribe עבור המשלוח
-        return () => deliveryUnsubscribe();
+        // המר ל-Delivery
+        const mappedDelivery: Delivery = {
+          id: activeDeliveryId!,
+          order_number: activeDeliveryId!.substring(0, 8).toUpperCase(),
+          customer_name: dbDelivery.customer_name,
+          customer_phone: dbDelivery.customer_phone,
+          package_description: dbDelivery.package_description,
+          pickup_address: dbDelivery.pickup_address,
+          pickup_phone: dbDelivery.customer_phone,
+          delivery_address: deliveryAddress,
+          delivery_notes: dbDelivery.delivery_notes || '',
+          payment_amount: 0,
+          status: mapStatusToEnglish(dbDelivery.status),
+          required_vehicle_type: mapVehicleType(dbDelivery.vehicle_type),
+          accepted_time: dbDelivery.accepted_time,
+          pickup_time: dbDelivery.pickup_time,
+          delivery_time: dbDelivery.delivery_time,
+          estimated_distance: '0 km',
+          estimated_duration: '0 min',
+          created_at: dbDelivery.createdAt,
+          updated_at: dbDelivery.createdAt,
+        };
+        
+        console.log(`✅ [ActiveJob] Loaded/Updated delivery:`, {
+          id: mappedDelivery.id,
+          status: mappedDelivery.status,
+          customer: mappedDelivery.customer_name,
+          is_batched: dbDelivery.is_batched,
+          batch_id: dbDelivery.batch_id
+        });
+        setDelivery(mappedDelivery);
+
+        // ✅ Check if this is a batched delivery and load the other delivery
+        if (dbDelivery.is_batched && dbDelivery.batch_id) {
+          console.log(`📦 [ActiveJob] This is a batched delivery, loading batch partner...`);
+          
+          // Find the other delivery in the batch from the snapshot we already have
+          snapshot.forEach((childSnapshot) => {
+            const otherDelivery = childSnapshot.val() as DBDelivery;
+            const deliveryId = childSnapshot.key!;
+            
+            if (
+              otherDelivery.batch_id === dbDelivery.batch_id &&
+              deliveryId !== activeDeliveryId &&
+              otherDelivery.is_batched
+            ) {
+              const otherDeliveryAddress = `${otherDelivery.delivery_street || ''}, ${otherDelivery.delivery_city || ''}`.trim();
+              
+              const mappedBatchDelivery: Delivery = {
+                id: deliveryId,
+                order_number: deliveryId.substring(0, 8).toUpperCase(),
+                customer_name: otherDelivery.customer_name,
+                customer_phone: otherDelivery.customer_phone,
+                package_description: otherDelivery.package_description,
+                pickup_address: otherDelivery.pickup_address,
+                pickup_phone: otherDelivery.customer_phone,
+                delivery_address: otherDeliveryAddress,
+                delivery_notes: otherDelivery.delivery_notes || '',
+                payment_amount: 0,
+                status: mapStatusToEnglish(otherDelivery.status),
+                required_vehicle_type: mapVehicleType(otherDelivery.vehicle_type),
+                accepted_time: otherDelivery.accepted_time,
+                pickup_time: otherDelivery.pickup_time,
+                delivery_time: otherDelivery.delivery_time,
+                estimated_distance: '0 km',
+                estimated_duration: '0 min',
+                created_at: otherDelivery.createdAt,
+                updated_at: otherDelivery.createdAt,
+              };
+              
+              console.log(`✅ [ActiveJob] Found batch partner:`, {
+                id: mappedBatchDelivery.id,
+                customer: mappedBatchDelivery.customer_name
+              });
+              
+              setBatchDelivery(mappedBatchDelivery);
+            }
+          });
+        } else {
+          // Not a batched delivery
+          setBatchDelivery(null);
+        }
+        
+        setIsLoading(false);
       });
       
       return () => unsubscribe();

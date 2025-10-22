@@ -1,24 +1,28 @@
 {
   "rules": {
     "Couriers": {
+      ".read": "auth != null",
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid",
-        "isAvailable": {
-          ".read": "auth != null",
-          ".write": "auth != null && auth.uid == $uid"
-        },
-        "lastStatusUpdate": {
-          ".read": "auth != null",
-          ".write": "auth != null && auth.uid == $uid"
-        },
-        "vehicle_type": {
-          ".read": "auth != null",
-          ".write": "auth != null && auth.uid == $uid"
-        }
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "Businesses": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "businesses": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
       }
     },
     "Deliveries": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "deliveries": {
       ".read": "auth != null",
       ".write": "auth != null"
     }

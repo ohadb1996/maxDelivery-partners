@@ -16,7 +16,7 @@ export default function SideNavigation({ isOpen, onToggle }: SideNavigationProps
   const navItems = [
     { name: "דשבורד", path: "/", icon: Home },
     { name: "פעיל", path: "/active", icon: Package },
-    { name: "היסטוריה", path: "/history", icon: History },
+    { name: "היסטוריית משלוחים", path: "/history", icon: History },
     { name: "פרופיל", path: "/profile", icon: UserIcon },
   ];
 

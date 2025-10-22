@@ -1,18 +1,20 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Clock, DollarSign, CheckCircle, Calendar, TrendingUp, Package } from "lucide-react";
+import { MapPin, Clock, DollarSign, CheckCircle, Calendar, Package, Search } from "lucide-react";
 import { Delivery } from "@/types";
 import { getCourierDeliveries } from "@/services/deliveryService";
 import { useAuth } from "@/context/AuthContext";
+
+type FilterType = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 export default function History() {
   const { user } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedFilter, setSelectedFilter] = useState<FilterType>('today');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
 
   useEffect(() => {
     if (user) {
@@ -46,46 +48,55 @@ export default function History() {
     setIsLoading(false);
   };
 
-  // Filter deliveries by selected date
+  // Get date range based on selected filter
+  const getDateRange = (): { start: Date; end: Date } => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    switch (selectedFilter) {
+      case 'today':
+        return { start: today, end: tomorrow };
+      
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { start: yesterday, end: today };
+      
+      case 'week':
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - 7);
+        return { start: weekStart, end: tomorrow };
+      
+      case 'month':
+        const monthStart = new Date(today);
+        monthStart.setDate(monthStart.getDate() - 30);
+        return { start: monthStart, end: tomorrow };
+      
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          const start = new Date(customStartDate);
+          const end = new Date(customEndDate);
+          end.setDate(end.getDate() + 1); // Include the end date
+          return { start, end };
+        }
+        return { start: today, end: tomorrow };
+      
+      default:
+        return { start: today, end: tomorrow };
+    }
+  };
+
+  // Filter deliveries by selected date range
   const filteredDeliveries = deliveries.filter(delivery => {
-    const deliveryDate = new Date(delivery.delivery_time || delivery.updated_at || 0)
-      .toISOString()
-      .split('T')[0];
-    return deliveryDate === selectedDate;
+    const deliveryDate = new Date(delivery.delivery_time || delivery.updated_at || 0);
+    const { start, end } = getDateRange();
+    return deliveryDate >= start && deliveryDate < end;
   });
 
-  // Get unique dates that have deliveries
-  const availableDates = Array.from(
-    new Set(
-      deliveries.map(d => 
-        new Date(d.delivery_time || d.updated_at || 0).toISOString().split('T')[0]
-      )
-    )
-  ).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
-  // Calculate stats for selected date
+  // Calculate stats for selected date range
   const totalEarnings = filteredDeliveries.reduce((sum, d) => sum + (d.payment_amount || 0), 0);
-
-  // Format date for display
-  const formatDateDisplay = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const dateOnly = dateString;
-    const todayOnly = today.toISOString().split('T')[0];
-    const yesterdayOnly = yesterday.toISOString().split('T')[0];
-    
-    if (dateOnly === todayOnly) return "היום";
-    if (dateOnly === yesterdayOnly) return "אתמול";
-    
-    return date.toLocaleDateString('he-IL', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -94,6 +105,35 @@ export default function History() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  // Get display text for current filter
+  const getFilterDisplayText = () => {
+    switch (selectedFilter) {
+      case 'today':
+        return 'היום';
+      case 'yesterday':
+        return 'אתמול';
+      case 'week':
+        return 'השבוע';
+      case 'month':
+        return 'החודש';
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return `${new Date(customStartDate).toLocaleDateString('he-IL')} - ${new Date(customEndDate).toLocaleDateString('he-IL')}`;
+        }
+        return 'טווח מותאם אישית';
+      default:
+        return '';
+    }
+  };
+
+  const handleCustomSearch = () => {
+    if (customStartDate && customEndDate) {
+      // Filter is already applied through the getDateRange function
+      // This just ensures the UI updates
+      setSelectedFilter('custom');
+    }
   };
 
     return (
@@ -112,73 +152,117 @@ export default function History() {
           </p>
         </div>
 
-        {isLoading ? (
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-1">
-              <div className="bg-gray-200 rounded-xl h-96 animate-pulse" />
-            </div>
-            <div className="md:col-span-2 space-y-4">
-          {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-gray-200 rounded-xl animate-pulse" />
-          ))}
+        {/* Filter Tabs */}
+        <div className="bg-white rounded-xl shadow-lg p-2 mb-6">
+          <div className="flex gap-2 overflow-x-auto">
+            <button
+              onClick={() => setSelectedFilter('today')}
+              className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
+                selectedFilter === 'today'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              היום
+            </button>
+            <button
+              onClick={() => setSelectedFilter('yesterday')}
+              className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
+                selectedFilter === 'yesterday'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              אתמול
+            </button>
+            <button
+              onClick={() => setSelectedFilter('week')}
+              className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
+                selectedFilter === 'week'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              השבוע
+            </button>
+            <button
+              onClick={() => setSelectedFilter('month')}
+              className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
+                selectedFilter === 'month'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              החודש
+            </button>
+            <button
+              onClick={() => setSelectedFilter('custom')}
+              className={`px-6 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
+                selectedFilter === 'custom'
+                  ? 'bg-blue-500 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              מותאם אישית
+            </button>
+          </div>
         </div>
-      </div>
-        ) : (
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Date Picker Section */}
-            <div className="md:col-span-1">
-              <div className="bg-white rounded-xl shadow-lg p-6 sticky top-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  בחר תאריך
-                </h2>
-                
-                {/* Calendar Input */}
+
+        {/* Custom Date Range Picker */}
+        {selectedFilter === 'custom' && (
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">בחר טווח תאריכים</h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  תאריך התחלה
+                </label>
                 <input
                   type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   dir="ltr"
                 />
-
-                {/* Quick Date Selection */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700 mb-2">בחירה מהירה:</p>
-                  {availableDates.slice(0, 10).map(date => (
-                    <button
-                      key={date}
-                      onClick={() => setSelectedDate(date)}
-                      className={`w-full text-right px-4 py-2 rounded-lg transition-all ${
-                        selectedDate === date
-                          ? 'bg-blue-500 text-white shadow-md'
-                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">{formatDateDisplay(date)}</span>
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          selectedDate === date ? 'bg-white/20' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {deliveries.filter(d => 
-                            new Date(d.delivery_time || d.updated_at || 0).toISOString().split('T')[0] === date
-                          ).length}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                  
-                  {availableDates.length === 0 && (
-                    <p className="text-gray-500 text-sm text-center py-4">
-                      אין משלוחים היסטוריים
-                    </p>
-                  )}
-                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  תאריך סיום
+                </label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  dir="ltr"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={handleCustomSearch}
+                  disabled={!customStartDate || !customEndDate}
+                  className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <Search className="w-5 h-5" />
+                  חפש
+                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Main Content Section */}
-            <div className="md:col-span-2">
+        {isLoading ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-24 bg-gray-200 rounded-xl animate-pulse" />
+              <div className="h-24 bg-gray-200 rounded-xl animate-pulse" />
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div>
               {/* Stats for Selected Date */}
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-white rounded-xl shadow-lg p-4">
@@ -209,14 +293,14 @@ export default function History() {
               {/* Deliveries List */}
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  משלוחים ב{formatDateDisplay(selectedDate)}
+                  משלוחים - {getFilterDisplayText()}
                 </h2>
 
                 {filteredDeliveries.length === 0 ? (
         <div className="text-center py-12">
                     <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg font-medium mb-1">אין משלוחים בתאריך זה</p>
-                    <p className="text-gray-400 text-sm">נסה לבחור תאריך אחר מהרשימה</p>
+                    <p className="text-gray-500 text-lg font-medium mb-1">אין משלוחים בטווח זה</p>
+                    <p className="text-gray-400 text-sm">נסה לבחור טווח תאריכים אחר</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -286,7 +370,6 @@ export default function History() {
         </div>
       )}
               </div>
-            </div>
           </div>
         )}
       </div>
