@@ -30,6 +30,9 @@ interface AuthUser extends User {
   isAvailable?: boolean;
   lastStatusUpdate?: string;
   vehicle_type?: VehicleType;
+  bank_name?: string;
+  bank_account?: string;
+  bank_branch?: string;
 }
 
 interface AuthContextType {
@@ -186,7 +189,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           lastLogin: userData.lastLogin,
           isAvailable: userData.isAvailable || false,
           lastStatusUpdate: userData.lastStatusUpdate,
-          vehicle_type: vehicleType
+          vehicle_type: vehicleType,
+          bank_name: userData.bank_name,
+          bank_account: userData.bank_account,
+          bank_branch: userData.bank_branch
         };
         console.log('[AuthContext] Setting user with username:', authUser.username, 'vehicle_type:', authUser.vehicle_type);
         setUser(authUser);

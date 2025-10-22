@@ -72,7 +72,7 @@ export default function ActiveJob() {
         
         // Find active delivery assigned to this courier
         let activeDeliveryId: string | null = null;
-        let activeDeliveryData: DBDelivery | null = null;
+        let activeDeliveryData: DBDelivery | null = null as DBDelivery | null;
         
         console.log('📦 [ActiveJob] Scanning all deliveries for courier assignments...');
         
