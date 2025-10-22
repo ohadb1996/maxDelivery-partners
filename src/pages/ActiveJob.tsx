@@ -124,13 +124,14 @@ export default function ActiveJob() {
         console.log(`📦 [ActiveJob] Found active delivery: ${activeDeliveryId}`);
         
         // Use the delivery data we already have
-        const dbDelivery = activeDeliveryData;
+        const dbDelivery = activeDeliveryData as DBDelivery;
+        const deliveryId = activeDeliveryId as string;
         const deliveryAddress = `${dbDelivery.delivery_street || ''}, ${dbDelivery.delivery_city || ''}`.trim();
         
         // המר ל-Delivery
         const mappedDelivery: Delivery = {
-          id: activeDeliveryId!,
-          order_number: activeDeliveryId!.substring(0, 8).toUpperCase(),
+          id: deliveryId,
+          order_number: deliveryId.substring(0, 8).toUpperCase(),
           customer_name: dbDelivery.customer_name,
           customer_phone: dbDelivery.customer_phone,
           package_description: dbDelivery.package_description,
@@ -166,18 +167,18 @@ export default function ActiveJob() {
           // Find the other delivery in the batch from the snapshot we already have
           snapshot.forEach((childSnapshot) => {
             const otherDelivery = childSnapshot.val() as DBDelivery;
-            const deliveryId = childSnapshot.key!;
+            const otherDeliveryId = childSnapshot.key!;
             
             if (
               otherDelivery.batch_id === dbDelivery.batch_id &&
-              deliveryId !== activeDeliveryId &&
+              otherDeliveryId !== deliveryId &&
               otherDelivery.is_batched
             ) {
               const otherDeliveryAddress = `${otherDelivery.delivery_street || ''}, ${otherDelivery.delivery_city || ''}`.trim();
               
               const mappedBatchDelivery: Delivery = {
-                id: deliveryId,
-                order_number: deliveryId.substring(0, 8).toUpperCase(),
+                id: otherDeliveryId,
+                order_number: otherDeliveryId.substring(0, 8).toUpperCase(),
                 customer_name: otherDelivery.customer_name,
                 customer_phone: otherDelivery.customer_phone,
                 package_description: otherDelivery.package_description,
