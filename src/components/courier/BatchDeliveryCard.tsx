@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, MapPin, DollarSign, TrendingUp, Navigation2 } from "lucide-react";
+import { Package, MapPin, DollarSign, Navigation2 } from "lucide-react";
 import { DeliveryBatch } from "@/services/batchingService";
 
 interface BatchDeliveryCardProps {
@@ -87,19 +87,6 @@ export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchD
             <MapPin className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
             <p className="text-gray-700">{delivery2.delivery_address}</p>
           </div>
-        </div>
-
-        {/* Benefits Banner */}
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded-lg p-3 mb-3">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-orange-600" />
-            <p className="text-sm font-bold text-orange-800">יתרונות משלוח כפול:</p>
-          </div>
-          <ul className="text-xs text-gray-700 space-y-1 mr-6">
-            <li>✅ הכנסה כפולה בנסיעה אחת</li>
-            <li>✅ חיסכון בדלק וזמן</li>
-            <li>✅ היעדים קרובים ({batch.distance_between_dropoffs} ק"מ)</li>
-          </ul>
         </div>
 
         {/* Accept Button */}

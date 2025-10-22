@@ -5,12 +5,16 @@
 
 import { Delivery } from '@/types';
 
+export type BatchType = 'single_business' | 'cross_business';
+
 export interface DeliveryBatch {
   id: string; // Unique batch ID
-  business_name: string;
-  business_email: string;
+  type: BatchType; // Type of batch
+  business_name: string; // For single_business, the business name. For cross_business, combined names
+  business_email: string; // For single_business, the email. For cross_business, combined emails
   deliveries: [Delivery, Delivery]; // Always exactly 2 deliveries
   distance_between_dropoffs: number; // Distance in km between the two drop-offs
+  distance_between_pickups?: number; // Distance in km between pickups (for cross_business)
   total_earnings: number; // Combined payment
   total_distance: number; // Total distance (pickup to first, first to second)
 }
@@ -42,19 +46,46 @@ function calculateDistance(
 }
 
 /**
+ * Interface for valid pair candidates with their distance
+ */
+interface SingleBusinessPairCandidate {
+  delivery1: Delivery;
+  delivery2: Delivery;
+  distance: number; // Distance between drop-offs
+  businessKey: string;
+  type: 'single_business';
+}
+
+interface CrossBusinessPairCandidate {
+  delivery1: Delivery;
+  delivery2: Delivery;
+  dropoffDistance: number; // Distance between drop-offs
+  pickupDistance: number; // Distance between pickups
+  timeDiffMinutes: number; // Time difference in minutes
+  type: 'cross_business';
+}
+
+type PairCandidate = SingleBusinessPairCandidate | CrossBusinessPairCandidate;
+
+/**
  * מוצא קבוצות של משלוחים שניתן לבצע ביחד (batching)
- * כללים:
- * - 2 משלוחים בדיוק
- * - מאותו עסק
- * - יעדים במרחק של עד 2 ק"מ זה מזה
+ * אלגוריתם משופר: תומך בשני סוגים של batching
+ * 1. Single-Business: משלוחים מאותו עסק עם יעדים קרובים
+ * 2. Cross-Business: משלוחים מעסקים שונים עם איסוף ויעד קרובים וזמן דומה
  */
 export function findBatchableDeliveries(
   availableDeliveries: Delivery[],
-  maxDistanceKm: number = 2
+  maxDropoffDistanceKm: number = 2,
+  maxPickupDistanceKm: number = 0.3,
+  maxTimeDiffMinutes: number = 10
 ): DeliveryBatch[] {
-  const batches: DeliveryBatch[] = [];
+  const finalBatches: DeliveryBatch[] = [];
+  const alreadyBatchedDeliveryIds = new Set<string>();
+  const allValidPairs: PairCandidate[] = [];
   
-  // קיבוץ משלוחים לפי עסק
+  console.log(`🔍 [Batching] Starting batch analysis for ${availableDeliveries.length} deliveries`);
+  
+  // Step 1: מצא Single-Business Batches
   const deliveriesByBusiness = new Map<string, Delivery[]>();
   
   availableDeliveries.forEach(delivery => {
@@ -69,74 +100,197 @@ export function findBatchableDeliveries(
       deliveriesByBusiness.set(businessKey, []);
     }
     deliveriesByBusiness.get(businessKey)!.push(delivery);
-    
-    console.log(`📦 [Batching] Delivery ${delivery.id} → Business: ${businessKey}, Has coords: ${!!delivery.delivery_coordinates}`);
   });
   
   console.log(`🔍 [Batching] Found ${deliveriesByBusiness.size} businesses with deliveries`);
   
-  // בדיקת זוגות משלוחים מכל עסק
+  // Find all single-business pairs
   deliveriesByBusiness.forEach((deliveries, businessKey) => {
-    if (deliveries.length < 2) return; // צריך לפחות 2 משלוחים
+    if (deliveries.length < 2) return;
     
-    console.log(`🔍 [Batching] Business ${businessKey} has ${deliveries.length} deliveries`);
+    console.log(`🏢 [Single-Business] Checking ${deliveries.length} deliveries for business ${businessKey}`);
     
-    // בדיקת כל זוג אפשרי
     for (let i = 0; i < deliveries.length; i++) {
       for (let j = i + 1; j < deliveries.length; j++) {
         const delivery1 = deliveries[i];
         const delivery2 = deliveries[j];
         
-        // בדיקה שלשניהם יש קואורדינטות
         const coords1 = delivery1.delivery_coordinates;
         const coords2 = delivery2.delivery_coordinates;
         
-        if (!coords1 || !coords2) {
-          console.warn(`⚠️ [Batching] Missing coordinates:`, {
-            delivery1: delivery1.id,
-            has_coords1: !!coords1,
-            delivery2: delivery2.id,
-            has_coords2: !!coords2
-          });
-          continue;
-        }
+        if (!coords1 || !coords2) continue;
         
-        // חישוב מרחק בין היעדים
-        const distance = calculateDistance(
+        const dropoffDistance = calculateDistance(
           coords1.lat,
           coords1.lng,
           coords2.lat,
           coords2.lng
         );
         
-        console.log(`📏 [Batching] Distance between ${delivery1.id} and ${delivery2.id}: ${distance.toFixed(2)} km`);
-        
-        // אם המרחק קטן או שווה למקסימום - זה בטח!
-        if (distance <= maxDistanceKm) {
-          const batch: DeliveryBatch = {
-            id: `batch_${delivery1.id}_${delivery2.id}`,
-            business_name: delivery1.business_name || 'Unknown Business',
-            business_email: businessKey,
-            deliveries: [delivery1, delivery2],
-            distance_between_dropoffs: Math.round(distance * 100) / 100,
-            total_earnings: (delivery1.payment_amount || 0) + (delivery2.payment_amount || 0),
-            total_distance: (delivery1.distance_km || 0) + (delivery2.distance_km || 0) + distance
-          };
-          
-          batches.push(batch);
-          console.log(`✅ [Batching] Created batch ${batch.id}:`, {
-            distance: `${distance.toFixed(2)} km`,
-            delivery1: delivery1.customer_name,
-            delivery2: delivery2.customer_name,
-            total_earnings: `₪${batch.total_earnings}`
+        if (dropoffDistance <= maxDropoffDistanceKm) {
+          allValidPairs.push({
+            delivery1,
+            delivery2,
+            distance: dropoffDistance,
+            businessKey,
+            type: 'single_business'
           });
+          console.log(`✅ [Single-Business] Valid pair: ${delivery1.id} + ${delivery2.id} (${dropoffDistance.toFixed(2)} km)`);
         }
       }
     }
   });
   
-  console.log(`✅ [Batching] Found ${batches.length} batchable delivery pairs`);
-  return batches;
+  // Step 2: מצא Cross-Business Batches
+  console.log(`🔄 [Cross-Business] Checking cross-business opportunities...`);
+  
+  for (let i = 0; i < availableDeliveries.length; i++) {
+    for (let j = i + 1; j < availableDeliveries.length; j++) {
+      const delivery1 = availableDeliveries[i];
+      const delivery2 = availableDeliveries[j];
+      
+      // Skip if same business (already handled above)
+      const business1 = delivery1.business_email || delivery1.business_name;
+      const business2 = delivery2.business_email || delivery2.business_name;
+      
+      if (business1 === business2) continue;
+      
+      // Check all required coordinates
+      const pickupCoords1 = delivery1.pickup_coordinates;
+      const pickupCoords2 = delivery2.pickup_coordinates;
+      const dropoffCoords1 = delivery1.delivery_coordinates;
+      const dropoffCoords2 = delivery2.delivery_coordinates;
+      
+      if (!pickupCoords1 || !pickupCoords2 || !dropoffCoords1 || !dropoffCoords2) {
+        continue;
+      }
+      
+      // Check pickup distance (must be <= 0.3 km)
+      const pickupDistance = calculateDistance(
+        pickupCoords1.lat,
+        pickupCoords1.lng,
+        pickupCoords2.lat,
+        pickupCoords2.lng
+      );
+      
+      if (pickupDistance > maxPickupDistanceKm) continue;
+      
+      // Check dropoff distance (must be <= 2.0 km)
+      const dropoffDistance = calculateDistance(
+        dropoffCoords1.lat,
+        dropoffCoords1.lng,
+        dropoffCoords2.lat,
+        dropoffCoords2.lng
+      );
+      
+      if (dropoffDistance > maxDropoffDistanceKm) continue;
+      
+      // Check time difference (must be < 10 minutes)
+      const time1 = new Date(delivery1.created_at).getTime();
+      const time2 = new Date(delivery2.created_at).getTime();
+      const timeDiffMinutes = Math.abs(time1 - time2) / (1000 * 60);
+      
+      if (timeDiffMinutes >= maxTimeDiffMinutes) continue;
+      
+      // Valid cross-business pair!
+      allValidPairs.push({
+        delivery1,
+        delivery2,
+        dropoffDistance,
+        pickupDistance,
+        timeDiffMinutes,
+        type: 'cross_business'
+      });
+      
+      console.log(`✅ [Cross-Business] Valid pair: ${delivery1.id} (${business1}) + ${delivery2.id} (${business2})`, {
+        pickupDist: `${pickupDistance.toFixed(2)} km`,
+        dropoffDist: `${dropoffDistance.toFixed(2)} km`,
+        timeDiff: `${timeDiffMinutes.toFixed(1)} min`
+      });
+    }
+  }
+  
+  console.log(`📊 [Batching] Found ${allValidPairs.length} total valid pairs (single-business + cross-business)`);
+  
+  // Step 3: Sort all pairs by priority (shortest distance first, prefer single-business)
+  allValidPairs.sort((a, b) => {
+    // Get the dropoff distance for comparison
+    const distA = a.type === 'single_business' ? a.distance : a.dropoffDistance;
+    const distB = b.type === 'single_business' ? b.distance : b.dropoffDistance;
+    
+    // Prefer single-business batches (slight bonus)
+    const bonusA = a.type === 'single_business' ? -0.1 : 0;
+    const bonusB = b.type === 'single_business' ? -0.1 : 0;
+    
+    return (distA + bonusA) - (distB + bonusB);
+  });
+  
+  // Step 4: Select best non-overlapping pairs
+  for (const pair of allValidPairs) {
+    const id1 = pair.delivery1.id;
+    const id2 = pair.delivery2.id;
+    
+    // Check if either delivery is already batched
+    if (alreadyBatchedDeliveryIds.has(id1) || alreadyBatchedDeliveryIds.has(id2)) {
+      console.log(`⏭️ [Batching] Skipping pair ${id1} + ${id2} - already batched`);
+      continue;
+    }
+    
+    // Create batch based on type
+    let batch: DeliveryBatch;
+    
+    if (pair.type === 'single_business') {
+      batch = {
+        id: `batch_${id1}_${id2}`,
+        type: 'single_business',
+        business_name: pair.delivery1.business_name || 'Unknown Business',
+        business_email: pair.businessKey,
+        deliveries: [pair.delivery1, pair.delivery2],
+        distance_between_dropoffs: Math.round(pair.distance * 100) / 100,
+        total_earnings: (pair.delivery1.payment_amount || 0) + (pair.delivery2.payment_amount || 0),
+        total_distance: (pair.delivery1.distance_km || 0) + (pair.delivery2.distance_km || 0) + pair.distance
+      };
+      
+      console.log(`✅ [Single-Business] Created batch ${batch.id}:`, {
+        business: pair.businessKey,
+        distance: `${pair.distance.toFixed(2)} km`,
+        earnings: `₪${batch.total_earnings}`
+      });
+    } else {
+      // Cross-business batch
+      const business1 = pair.delivery1.business_name || 'Business 1';
+      const business2 = pair.delivery2.business_name || 'Business 2';
+      
+      batch = {
+        id: `cross_batch_${id1}_${id2}`,
+        type: 'cross_business',
+        business_name: `${business1} + ${business2}`,
+        business_email: `${pair.delivery1.business_email || ''} | ${pair.delivery2.business_email || ''}`,
+        deliveries: [pair.delivery1, pair.delivery2],
+        distance_between_dropoffs: Math.round(pair.dropoffDistance * 100) / 100,
+        distance_between_pickups: Math.round(pair.pickupDistance * 100) / 100,
+        total_earnings: (pair.delivery1.payment_amount || 0) + (pair.delivery2.payment_amount || 0),
+        total_distance: (pair.delivery1.distance_km || 0) + (pair.delivery2.distance_km || 0) + pair.dropoffDistance
+      };
+      
+      console.log(`✅ [Cross-Business] Created batch ${batch.id}:`, {
+        businesses: `${business1} + ${business2}`,
+        pickupDist: `${pair.pickupDistance.toFixed(2)} km`,
+        dropoffDist: `${pair.dropoffDistance.toFixed(2)} km`,
+        timeDiff: `${pair.timeDiffMinutes.toFixed(1)} min`,
+        earnings: `₪${batch.total_earnings}`
+      });
+    }
+    
+    finalBatches.push(batch);
+    alreadyBatchedDeliveryIds.add(id1);
+    alreadyBatchedDeliveryIds.add(id2);
+  }
+  
+  console.log(`✅ [Batching] Created ${finalBatches.length} optimal batches (${finalBatches.filter(b => b.type === 'single_business').length} single-business, ${finalBatches.filter(b => b.type === 'cross_business').length} cross-business)`);
+  console.log(`📦 [Batching] Batched delivery IDs:`, Array.from(alreadyBatchedDeliveryIds));
+  
+  return finalBatches;
 }
 
 /**
