@@ -13,11 +13,30 @@ interface JobCardProps {
   onAccept?: () => void;
   onSelect?: () => void;
   isSelected?: boolean;
+  isAvailable?: boolean;
 }
 
-export default function JobCard({ delivery, onClick, onAccept, onSelect, isSelected = false }: JobCardProps) {
+export default function JobCard({ delivery, onClick, onAccept, onSelect, isSelected = false, isAvailable: propIsAvailable }: JobCardProps) {
   const { user } = useAuth();
-  const isAvailable = user?.isAvailable || false;
+  const isAvailable = propIsAvailable !== undefined ? propIsAvailable : (user?.isAvailable || false);
+
+  // חשב זמן נסיעה לפי סוג הרכב
+  const calculateTravelTime = (distanceKm: number, vehicleType: string): string => {
+    if (!distanceKm) return '0 דק';
+    
+    // מהירויות ממוצעות לפי סוג רכב (קמ"ש)
+    const speeds = {
+      bike: 15,        // אופניים
+      motorcycle: 25,  // אופנוע
+      car: 30,         // רכב
+      truck: 20        // משאית
+    };
+    
+    const speed = speeds[vehicleType as keyof typeof speeds] || 20;
+    const timeInMinutes = Math.round((distanceKm / speed) * 60);
+    
+    return `${timeInMinutes} דק`;
+  };
 
   const vehicleIcons = {
     bike: Bike,
@@ -120,16 +139,16 @@ export default function JobCard({ delivery, onClick, onAccept, onSelect, isSelec
           </div>
 
           <div className="flex items-center gap-4 mt-4 pt-3 border-t">
-            {delivery.estimated_distance && (
+            {delivery.distance_km && (
               <div className="flex items-center gap-1 text-sm text-gray-600">
                 <Navigation2 className="w-4 h-4" />
-                <span>{delivery.estimated_distance}</span>
+                <span>{delivery.distance_km} ק"מ</span>
               </div>
             )}
-            {delivery.estimated_duration && (
+            {delivery.distance_km && (
               <div className="flex items-center gap-1 text-sm text-gray-600">
                 <Clock className="w-4 h-4" />
-                <span>{delivery.estimated_duration}</span>
+                <span>{calculateTravelTime(delivery.distance_km, delivery.required_vehicle_type)}</span>
               </div>
             )}
           </div>

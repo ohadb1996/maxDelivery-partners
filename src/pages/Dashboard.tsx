@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Delivery, Courier, canVehicleTakeDelivery } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeToAvailableDeliveries, assignDeliveryToCourier, assignBatchToCourier } from "@/services/deliveryService";
 import { findBatchableDeliveries, DeliveryBatch } from "@/services/batchingService";
+import { locationService } from "@/services/locationService";
 
 import MapView from "@/components/courier/MapView";
 import SimpleToggle from "@/components/courier/SimpleToggle";
@@ -18,10 +19,12 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
+  const [hasActiveDelivery, setHasActiveDelivery] = useState(false);
 
   useEffect(() => {
     if (authUser) {
       loadData();
+      checkForActiveDelivery();
       
       // הרשמה לעדכונים בזמן אמת של משלוחים זמינים
       console.log('📡 [Dashboard] Subscribing to real-time delivery updates');
@@ -37,6 +40,52 @@ export default function Dashboard() {
     }
   }, [authUser]);
 
+  // בדוק אם יש משלוח פעיל
+  const checkForActiveDelivery = async () => {
+    if (!authUser) return;
+
+    try {
+      console.log('🔍 [Dashboard] Checking for active delivery...');
+      
+      // בדוק אם יש משלוחים פעילים של השליח
+      const { ref, onValue } = await import('firebase/database');
+      const { db } = await import('@/api/config/firebase.config');
+      
+      const deliveriesRef = ref(db, 'Deliveries');
+      onValue(deliveriesRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          let foundActiveDelivery = false;
+          
+          // סטטוסים שמשמעותם משלוח פעיל
+          const activeStatuses = ['מקבל', 'הגיע לנקודת איסוף', 'נאסף', 'הגיע ליעד'];
+          
+          Object.keys(data).forEach((deliveryId) => {
+            const delivery = data[deliveryId];
+            
+            // בדוק אם המשלוח מוקצה לשליח הזה ויש לו סטטוס פעיל
+            if (delivery.assigned_courier === authUser.uid && 
+                activeStatuses.includes(delivery.status) &&
+                delivery.accepted_time) {
+              foundActiveDelivery = true;
+              console.log(`✅ [Dashboard] Found active delivery: ${deliveryId} with status: ${delivery.status}`);
+            }
+          });
+          
+          setHasActiveDelivery(foundActiveDelivery);
+          
+          if (foundActiveDelivery) {
+            console.log('⚠️ [Dashboard] Courier has active delivery - blocking new job acceptance');
+          } else {
+            console.log('✅ [Dashboard] No active delivery found - courier can accept new jobs');
+          }
+        }
+      });
+    } catch (error) {
+      console.error('❌ [Dashboard] Error checking for active delivery:', error);
+    }
+  };
+
   // Sync courier availability with authUser
   useEffect(() => {
     if (authUser && courier) {
@@ -46,6 +95,31 @@ export default function Dashboard() {
       }
     }
   }, [authUser?.isAvailable]);
+
+  // 📍 GPS Tracking - Track location when courier is available
+  useEffect(() => {
+    if (!authUser) return;
+
+    const isAvailable = courier?.is_available || false;
+    
+    if (isAvailable) {
+      // השליח זמין - התחל מעקב מיקום
+      console.log('📍 [Dashboard] Courier is available - starting GPS tracking');
+      locationService.startTracking(authUser.uid, true);
+    } else {
+      // השליח לא זמין - עצור מעקב
+      console.log('📍 [Dashboard] Courier is unavailable - stopping GPS tracking');
+      locationService.stopTracking();
+    }
+
+    // Cleanup - עצור מעקב כשהקומפוננטה נהרסת
+    return () => {
+      if (locationService.isTrackingActive()) {
+        console.log('📍 [Dashboard] Component unmounting - stopping GPS tracking');
+        locationService.stopTracking();
+      }
+    };
+  }, [authUser, courier?.is_available]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -80,23 +154,27 @@ export default function Dashboard() {
   };
 
   // סינון משלוחים לפי רמת התחבורה של השליח
-  const filteredDeliveries = deliveries.filter(delivery => {
-    if (!courier) return false;
-    const canTake = canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
-    console.log(`🚗 [Dashboard] Vehicle check:`, {
-      delivery_id: delivery.id,
-      courier_vehicle: courier.vehicle_type,
-      required_vehicle: delivery.required_vehicle_type,
-      can_take: canTake
+  const filteredDeliveries = useMemo(() => {
+    const filtered = deliveries.filter(delivery => {
+      if (!courier) return false;
+      const canTake = canVehicleTakeDelivery(courier.vehicle_type, delivery.required_vehicle_type);
+      console.log(`🚗 [Dashboard] Vehicle check:`, {
+        delivery_id: delivery.id,
+        courier_vehicle: courier.vehicle_type,
+        required_vehicle: delivery.required_vehicle_type,
+        can_take: canTake
+      });
+      return canTake;
     });
-    return canTake;
-  });
 
-  console.log(`📊 [Dashboard] Filtered deliveries:`, {
-    total: deliveries.length,
-    filtered: filteredDeliveries.length,
-    courier_vehicle: courier?.vehicle_type
-  });
+    console.log(`📊 [Dashboard] Filtered deliveries:`, {
+      total: deliveries.length,
+      filtered: filtered.length,
+      courier_vehicle: courier?.vehicle_type
+    });
+
+    return filtered;
+  }, [deliveries, courier]);
 
   // 🔄 Calculate batches from filtered deliveries
   useEffect(() => {
@@ -173,6 +251,12 @@ export default function Dashboard() {
       return;
     }
 
+    if (hasActiveDelivery) {
+      console.error('❌ [Dashboard] Cannot accept job - courier has active delivery');
+      alert('⚠️ יש לך משלוח פעיל! סיים את המשלוח הנוכחי לפני קבלת משלוח חדש.');
+      return;
+    }
+
     console.log('📝 [Dashboard] Accepting job:', delivery.id);
     
     try {
@@ -200,6 +284,12 @@ export default function Dashboard() {
 
     if (!courier.is_available) {
       console.error('❌ [Dashboard] Cannot accept batch - courier is not available');
+      return;
+    }
+
+    if (hasActiveDelivery) {
+      console.error('❌ [Dashboard] Cannot accept batch - courier has active delivery');
+      alert('⚠️ יש לך משלוח פעיל! סיים את המשלוח הנוכחי לפני קבלת משלוח חדש.');
       return;
     }
 
@@ -254,6 +344,7 @@ export default function Dashboard() {
         deliveries={filteredDeliveries}
         batches={batches}
         isAvailable={courier?.is_available || false}
+        hasActiveDelivery={hasActiveDelivery}
         onJobClick={handleJobClick}
         onAcceptJob={handleAcceptJob}
         onAcceptBatch={handleAcceptBatch}

@@ -214,29 +214,6 @@ export default function MapView({
         </div>
       )}
 
-      {/* Route to Pickup Info - Left side */}
-      {routeToPickupInfo && (
-        <div className="absolute top-4 left-4 z-50 bg-white px-4 py-2 rounded-lg shadow-lg border-r-4 border-blue-500">
-          <div className="text-xs text-gray-500 mb-1">אל נקודת איסוף</div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="font-semibold">📍 {routeToPickupInfo.distance}</span>
-            <span className="text-gray-400">|</span>
-            <span className="font-semibold">⏱️ {routeToPickupInfo.duration}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Route to Delivery Info - Right side */}
-      {routeToDeliveryInfo && (
-        <div className="absolute top-4 right-4 z-50 bg-white px-4 py-2 rounded-lg shadow-lg border-r-4 border-green-500">
-          <div className="text-xs text-gray-500 mb-1">אל יעד המשלוח</div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="font-semibold">📍 {routeToDeliveryInfo.distance}</span>
-            <span className="text-gray-400">|</span>
-            <span className="font-semibold">⏱️ {routeToDeliveryInfo.duration}</span>
-          </div>
-        </div>
-      )}
 
       <MapContainer
         center={mapSettings.center}

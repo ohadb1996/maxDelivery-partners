@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Map interaction fixes */
+.map-container {
+  pointer-events: auto !important;
+}
+
+.map-container .leaflet-container {
+  pointer-events: auto !important;
+}
+
+.map-container .leaflet-control-container {
+  pointer-events: auto !important;
+}
+
+/* Ensure map tiles are interactive */
+.map-container .leaflet-tile-container {
+  pointer-events: auto !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

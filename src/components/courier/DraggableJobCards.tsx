@@ -10,6 +10,7 @@ interface DraggableJobCardsProps {
   deliveries: Delivery[];
   batches?: DeliveryBatch[];
   isAvailable: boolean;
+  hasActiveDelivery: boolean;
   onJobClick: (delivery: Delivery) => void;
   onAcceptJob: (delivery: Delivery) => void;
   onAcceptBatch?: (batch: DeliveryBatch) => void;
@@ -20,7 +21,8 @@ interface DraggableJobCardsProps {
 export default function DraggableJobCards({ 
   deliveries, 
   batches = [],
-  isAvailable, 
+  isAvailable,
+  hasActiveDelivery,
   onJobClick, 
   onAcceptJob,
   onAcceptBatch,
@@ -29,7 +31,7 @@ export default function DraggableJobCards({
 }: DraggableJobCardsProps) {
   // Position configuration
   const MIN_TOP_OFFSET = 80; // Space for header (navbar)
-  const COLLAPSED_VISIBLE_HEIGHT = 100; // How much is visible when collapsed (only handle)
+  const COLLAPSED_VISIBLE_HEIGHT = 200; // How much is visible when collapsed (handle + peek of content)
   const SNAP_THRESHOLD = 50; // Minimum drag distance to trigger snap
   
   // States
@@ -60,9 +62,9 @@ export default function DraggableJobCards({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Only start dragging if touch is on the drag handle area
+    // Allow dragging from drag handle or peek content
     const target = e.target as HTMLElement;
-    if (target.closest('.drag-handle')) {
+    if (target.closest('.drag-handle') || target.closest('.peek-content')) {
       setIsDragging(true);
       setStartY(e.touches[0].clientY);
       setDragOffset(0);
@@ -174,10 +176,27 @@ export default function DraggableJobCards({
         <div className="w-20 h-2 bg-gray-400 rounded-full hover:bg-gray-500 transition-colors"></div>
       </div>
       
-      {/* Collapsed State Indicator */}
-      {!isExpanded && !isDragging && deliveries.length > 0 && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
-          {deliveries.length} משלוחים זמינים
+      {/* Peek Content - Show when collapsed */}
+      {!isExpanded && !isDragging && (
+        <div 
+          className="peek-content px-4 py-2 cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900 text-right">משלוחים זמינים</h3>
+            {deliveries.length > 0 ? (
+              <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
+                <TrendingUp className="w-4 h-4" />
+                {deliveries.length} מתאימים
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-sm text-gray-500 font-medium">
+                <PackageIcon className="w-4 h-4" />
+                אין משלוחים
+              </div>
+            )}
+          </div>
         </div>
       )}
       
@@ -205,7 +224,16 @@ export default function DraggableJobCards({
         )}
 
         {/* Status Messages */}
-        {(isExpanded || isDragging) && !isAvailable && deliveries.length > 0 && (
+        {(isExpanded || isDragging) && hasActiveDelivery && (
+          <Alert className="mb-4 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800 text-sm">
+              ⚠️ יש לך משלוח פעיל! סיים את המשלוח הנוכחי לפני קבלת משלוח חדש.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(isExpanded || isDragging) && !isAvailable && deliveries.length > 0 && !hasActiveDelivery && (
           <Alert className="mb-4 border-orange-200 bg-orange-50">
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800 text-sm">
@@ -241,6 +269,8 @@ export default function DraggableJobCards({
                 key={batch.id}
                 batch={batch}
                 onAccept={onAcceptBatch || (() => {})}
+                isAvailable={isAvailable && !hasActiveDelivery}
+                {...({} as any)}
               />
             ))}
           </div>
@@ -266,6 +296,8 @@ export default function DraggableJobCards({
                   onAccept={() => onAcceptJob(delivery)}
                   onSelect={() => onSelectDelivery(delivery)}
                   isSelected={delivery.id === selectedDeliveryId}
+                  isAvailable={isAvailable && !hasActiveDelivery}
+                  {...({} as any)}
                 />
               ))
             }

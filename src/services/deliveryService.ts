@@ -96,7 +96,9 @@ const convertDBDeliveryToDelivery = (id: string, dbDelivery: DBDelivery): Delive
     delivery_street: dbDelivery.delivery_street
   });
   
-  const deliveryAddress = `${dbDelivery.delivery_street || ''}, ${dbDelivery.delivery_city || ''}`.trim();
+  // בנה כתובת מסירה מלאה - עדיפות ל-delivery_address המלא, אחרת בנה מיחידות
+  const deliveryAddress = dbDelivery.delivery_address || 
+    `${dbDelivery.delivery_street || ''} ${dbDelivery.delivery_building_number || ''}, ${dbDelivery.delivery_city || ''}`.trim();
   const mappedVehicleType = mapVehicleType(dbDelivery.vehicle_type);
   
   console.log(`🔄 [DeliveryService] Mapped vehicle type: ${dbDelivery.vehicle_type} -> ${mappedVehicleType}`);

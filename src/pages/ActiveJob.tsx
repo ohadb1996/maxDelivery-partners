@@ -27,6 +27,7 @@ interface DBDelivery {
   delivery_notes?: string;
   pickup_address: string;
   business_name: string;
+  business_email?: string;
   status: string;
   assigned_courier?: string;
   accepted_time?: string;

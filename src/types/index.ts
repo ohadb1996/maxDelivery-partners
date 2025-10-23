@@ -31,6 +31,14 @@ export interface Courier {
   rating?: number;
   created_at: string;
   updated_at: string;
+  // 📍 מיקום GPS
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number; // דיוק המיקום במטרים
+    lastUpdated: string; // מתי עודכן המיקום לאחרונה
+  };
+  locationSharingEnabled?: boolean; // האם השליח מאפשר שיתוף מיקום
 }
 
 export interface Delivery {
