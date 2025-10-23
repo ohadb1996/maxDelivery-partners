@@ -11,10 +11,9 @@ interface BatchDeliveryCardProps {
   isAvailable?: boolean;
 }
 
-export default function BatchDeliveryCard({ batch, onAccept, isLoading, isAvailable: propIsAvailable }: BatchDeliveryCardProps) {
+export default function BatchDeliveryCard({ batch, onAccept, isLoading }: BatchDeliveryCardProps) {
   const [delivery1, delivery2] = batch.deliveries;
   const isCrossBusiness = batch.type === 'cross_business';
-  const isAvailable = propIsAvailable !== undefined ? propIsAvailable : true;
 
   return (
     <Card className={`border-2 shadow-lg hover:shadow-xl transition-shadow ${

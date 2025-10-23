@@ -34,6 +34,8 @@ interface DBDelivery {
   pickup_time?: string;
   delivery_time?: string;
   updated_at?: string;
+  // Full delivery address (if available)
+  delivery_address?: string;
   // Coordinate fields (from geocoding)
   delivery_coordinates?: {
     lat: number;
