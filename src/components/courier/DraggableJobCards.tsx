@@ -29,7 +29,7 @@ export default function DraggableJobCards({
 }: DraggableJobCardsProps) {
   // Position configuration
   const MIN_TOP_OFFSET = 80; // Space for header (navbar)
-  const COLLAPSED_VISIBLE_HEIGHT = 140; // How much is visible when collapsed (handle + peek)
+  const COLLAPSED_VISIBLE_HEIGHT = 100; // How much is visible when collapsed (only handle)
   const SNAP_THRESHOLD = 50; // Minimum drag distance to trigger snap
   
   // States
@@ -60,9 +60,13 @@ export default function DraggableJobCards({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    setIsDragging(true);
-    setStartY(e.touches[0].clientY);
-    setDragOffset(0);
+    // Only start dragging if touch is on the drag handle area
+    const target = e.target as HTMLElement;
+    if (target.closest('.drag-handle')) {
+      setIsDragging(true);
+      setStartY(e.touches[0].clientY);
+      setDragOffset(0);
+    }
   }, []);
 
   const handleMove = useCallback((clientY: number) => {
@@ -153,36 +157,55 @@ export default function DraggableJobCards({
   return (
     <div 
       ref={containerRef}
-      className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-40 overflow-hidden"
+      className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-30 overflow-hidden"
       style={{ 
         height: `${getCurrentHeight()}px`,
         cursor: isDragging ? 'grabbing' : 'grab',
         transition: isDragging ? 'none' : 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        pointerEvents: 'auto',
       }}
     >
       {/* Drag Handle */}
       <div 
-        className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing hover:bg-gray-50 transition-colors rounded-t-3xl sticky top-0 bg-white z-50"
+        className="drag-handle flex justify-center pt-4 pb-3 cursor-grab active:cursor-grabbing hover:bg-gray-50 transition-colors rounded-t-3xl sticky top-0 bg-white z-50"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        <div className="w-12 h-1 bg-gray-400 rounded-full hover:bg-gray-500 transition-colors"></div>
+        <div className="w-20 h-2 bg-gray-400 rounded-full hover:bg-gray-500 transition-colors"></div>
       </div>
       
-      {/* Content */}
-      <div className="px-4 pb-24 overflow-y-auto h-full" style={{ touchAction: isDragging ? 'none' : 'auto' }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900 text-right">משלוחים זמינים</h2>
-          {deliveries.length > 0 && (
-            <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
-              <TrendingUp className="w-4 h-4" />
-              {deliveries.length} מתאימים
-            </div>
-          )}
+      {/* Collapsed State Indicator */}
+      {!isExpanded && !isDragging && deliveries.length > 0 && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+          {deliveries.length} משלוחים זמינים
         </div>
+      )}
+      
+      {/* Content */}
+      <div 
+        className="px-4 pb-24 overflow-y-auto h-full" 
+        style={{ 
+          touchAction: isDragging ? 'none' : 'auto',
+          pointerEvents: isDragging ? 'none' : 'auto'
+        }}
+      >
+        {/* Show content only when expanded or when dragging */}
+        {(isExpanded || isDragging) && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 text-right">משלוחים זמינים</h2>
+              {deliveries.length > 0 && (
+                <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
+                  <TrendingUp className="w-4 h-4" />
+                  {deliveries.length} מתאימים
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Status Messages */}
-        {!isAvailable && deliveries.length > 0 && (
+        {(isExpanded || isDragging) && !isAvailable && deliveries.length > 0 && (
           <Alert className="mb-4 border-orange-200 bg-orange-50">
             <AlertCircle className="h-4 w-4 text-orange-600" />
             <AlertDescription className="text-orange-800 text-sm">
@@ -191,7 +214,7 @@ export default function DraggableJobCards({
           </Alert>
         )}
 
-        {deliveries.length === 0 && (
+        {(isExpanded || isDragging) && deliveries.length === 0 && (
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <PackageIcon className="w-8 h-8 text-gray-400" />
@@ -202,7 +225,7 @@ export default function DraggableJobCards({
         )}
 
         {/* Batch Opportunities - Show first */}
-        {batches.length > 0 && (
+        {(isExpanded || isDragging) && batches.length > 0 && (
           <div className="space-y-3 mb-6">
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-3">
               <h3 className="text-sm font-bold text-purple-800 flex items-center gap-2">
@@ -224,28 +247,30 @@ export default function DraggableJobCards({
         )}
 
         {/* Individual Delivery Cards */}
-        <div className="space-y-3 pb-4">
-          {deliveries
-            .filter(delivery => {
-              // סנן משלוחים שכבר חלק מבטח
-              const isInBatch = batches.some(batch => 
-                batch.deliveries[0].id === delivery.id || 
-                batch.deliveries[1].id === delivery.id
-              );
-              return !isInBatch;
-            })
-            .map((delivery) => (
-              <JobCard
-                key={delivery.id}
-                delivery={delivery}
-                onClick={() => onJobClick(delivery)}
-                onAccept={() => onAcceptJob(delivery)}
-                onSelect={() => onSelectDelivery(delivery)}
-                isSelected={delivery.id === selectedDeliveryId}
-              />
-            ))
-          }
-        </div>
+        {(isExpanded || isDragging) && (
+          <div className="space-y-3 pb-4">
+            {deliveries
+              .filter(delivery => {
+                // סנן משלוחים שכבר חלק מבטח
+                const isInBatch = batches.some(batch => 
+                  batch.deliveries[0].id === delivery.id || 
+                  batch.deliveries[1].id === delivery.id
+                );
+                return !isInBatch;
+              })
+              .map((delivery) => (
+                <JobCard
+                  key={delivery.id}
+                  delivery={delivery}
+                  onClick={() => onJobClick(delivery)}
+                  onAccept={() => onAcceptJob(delivery)}
+                  onSelect={() => onSelectDelivery(delivery)}
+                  isSelected={delivery.id === selectedDeliveryId}
+                />
+              ))
+            }
+          </div>
+        )}
       </div>
     </div>
   );
