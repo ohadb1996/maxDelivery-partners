@@ -176,6 +176,58 @@ function formatDuration(seconds: number): string {
 }
 
 /**
+ * המרה הפוכה - מקואורדינטות לכתובת (Reverse Geocoding)
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?` +
+      `lat=${lat}&lon=${lng}` +
+      `&format=json&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'MaxDelivery Courier App'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      console.error('[Reverse Geocoding] Failed to fetch:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data && data.address) {
+      const address = data.address;
+      
+      // בניית כתובת מלאה: רחוב + מספר בית + עיר
+      const parts = [];
+      
+      if (address.road) {
+        parts.push(address.road);
+      }
+      if (address.house_number) {
+        parts.push(address.house_number);
+      }
+      if (address.city || address.town || address.village) {
+        parts.push(address.city || address.town || address.village);
+      }
+      
+      const fullAddress = parts.join(', ');
+      console.log(`✅ [Reverse Geocoding] Got address:`, fullAddress);
+      return fullAddress || data.display_name;
+    }
+
+    console.warn(`⚠️ [Reverse Geocoding] No address found for coordinates`);
+    return null;
+  } catch (error) {
+    console.error('[Reverse Geocoding] Error:', error);
+    return null;
+  }
+}
+
+/**
  * cache למיקומים כדי לא לבצע geocoding מיותר
  */
 const geocodeCache: Map<string, LatLng> = new Map();

@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Delivery, VehicleType } from '@/types';
-import { geocodeAddressWithCache, getRoute, decodePolyline, LatLng } from '@/services/geocodingService';
+import { geocodeAddressWithCache, getRoute, decodePolyline, LatLng, reverseGeocode } from '@/services/geocodingService';
 
 // Fix for default markers in react-leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -60,6 +60,7 @@ export default function MapView({
   courierVehicleType 
 }: MapViewProps) {
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
   const [pickupLocation, setPickupLocation] = useState<LatLng | null>(null);
   const [deliveryLocation, setDeliveryLocation] = useState<LatLng | null>(null);
   const [routeToPickupPolyline, setRouteToPickupPolyline] = useState<LatLng[]>([]);
@@ -68,24 +69,31 @@ export default function MapView({
   const [routeToDeliveryInfo, setRouteToDeliveryInfo] = useState<{ distance: string; duration: string } | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
-  // Get user's current location
+  // Get user's current location and address
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
+        async (position) => {
+          const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          });
+          };
+          setUserLocation(location);
+          
+          // Get address from coordinates
+          const address = await reverseGeocode(location.lat, location.lng);
+          setUserAddress(address);
         },
         () => {
           // Default to Tel Aviv if location access denied
           setUserLocation({ lat: 32.0853, lng: 34.7818 });
+          setUserAddress('תל אביב-יפו');
         }
       );
     } else {
       // Default to Tel Aviv
       setUserLocation({ lat: 32.0853, lng: 34.7818 });
+      setUserAddress('תל אביב-יפו');
     }
   }, []);
 
@@ -251,8 +259,12 @@ export default function MapView({
           <Marker position={[userLocation.lat, userLocation.lng]} icon={courierIcon}>
             <Popup>
               <div className="text-center">
-                <p className="font-semibold">המיקום שלך</p>
-                <p className="text-sm text-gray-600">🚴 השליח</p>
+                <p className="font-semibold mb-1">המיקום שלך 🚴</p>
+                {userAddress ? (
+                  <p className="text-sm text-gray-600">{userAddress}</p>
+                ) : (
+                  <p className="text-xs text-gray-400">טוען כתובת...</p>
+                )}
               </div>
             </Popup>
           </Marker>

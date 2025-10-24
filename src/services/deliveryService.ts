@@ -441,6 +441,24 @@ export const updateDeliveryStatus = async (
     
     console.log(`📝 [DeliveryService] Updating delivery ${deliveryId} status to ${newStatus}`);
     
+    // ✅ Check if this delivery is part of a batch
+    const deliveryRef = ref(db, `Deliveries/${deliveryId}`);
+    const deliverySnapshot = await get(deliveryRef);
+    
+    if (!deliverySnapshot.exists()) {
+      console.error(`❌ [DeliveryService] Delivery ${deliveryId} not found`);
+      return false;
+    }
+    
+    const deliveryData = deliverySnapshot.val();
+    const isBatched = deliveryData.is_batched === true;
+    const batchId = deliveryData.batch_id;
+    
+    console.log(`📦 [DeliveryService] Delivery info:`, {
+      is_batched: isBatched,
+      batch_id: batchId
+    });
+    
     // מיפוי סטטוסים מאנגלית לעברית
     const statusMapping: Record<string, string> = {
       'accepted': 'מקבל',
@@ -454,8 +472,7 @@ export const updateDeliveryStatus = async (
     const hebrewStatus = statusMapping[newStatus] || newStatus;
     const timestamp = new Date().toISOString();
     
-    // עדכן ב-Deliveries
-    const deliveryRef = ref(db, `Deliveries/${deliveryId}`);
+    // הכן את העדכונים
     const updates: Record<string, any> = {
       status: hebrewStatus,
       updated_at: timestamp
@@ -468,16 +485,54 @@ export const updateDeliveryStatus = async (
       updates.delivery_time = timestamp;
     }
     
-    await update(deliveryRef, updates);
-    
-    // עדכן ב-CollectedDeliveries של השליח
-    const courierDeliveryRef = ref(db, `Couriers/${courierId}/CollectedDeliveries/${deliveryId}`);
-    await update(courierDeliveryRef, {
-      status: hebrewStatus,
-      updated_at: timestamp
-    });
-    
-    console.log(`✅ [DeliveryService] Updated delivery status to ${hebrewStatus}`);
+    // ✅ If this is a batched delivery, update ALL deliveries in the batch
+    if (isBatched && batchId) {
+      console.log(`📦 [DeliveryService] This is a batched delivery, finding all deliveries in batch ${batchId}`);
+      
+      // Find all deliveries with the same batch_id
+      const allDeliveriesRef = ref(db, 'Deliveries');
+      const allDeliveriesSnapshot = await get(allDeliveriesRef);
+      
+      if (allDeliveriesSnapshot.exists()) {
+        const allDeliveries = allDeliveriesSnapshot.val();
+        const batchDeliveryIds: string[] = [];
+        
+        Object.keys(allDeliveries).forEach((id) => {
+          if (allDeliveries[id].batch_id === batchId && allDeliveries[id].is_batched) {
+            batchDeliveryIds.push(id);
+          }
+        });
+        
+        console.log(`📦 [DeliveryService] Found ${batchDeliveryIds.length} deliveries in batch:`, batchDeliveryIds);
+        
+        // Update ALL deliveries in the batch
+        for (const batchDeliveryId of batchDeliveryIds) {
+          const batchDeliveryRef = ref(db, `Deliveries/${batchDeliveryId}`);
+          await update(batchDeliveryRef, updates);
+          
+          // עדכן ב-CollectedDeliveries של השליח
+          const courierDeliveryRef = ref(db, `Couriers/${courierId}/CollectedDeliveries/${batchDeliveryId}`);
+          await update(courierDeliveryRef, {
+            status: hebrewStatus,
+            updated_at: timestamp
+          });
+          
+          console.log(`✅ [DeliveryService] Updated batched delivery ${batchDeliveryId} to ${hebrewStatus}`);
+        }
+      }
+    } else {
+      // Single delivery (not batched)
+      await update(deliveryRef, updates);
+      
+      // עדכן ב-CollectedDeliveries של השליח
+      const courierDeliveryRef = ref(db, `Couriers/${courierId}/CollectedDeliveries/${deliveryId}`);
+      await update(courierDeliveryRef, {
+        status: hebrewStatus,
+        updated_at: timestamp
+      });
+      
+      console.log(`✅ [DeliveryService] Updated single delivery status to ${hebrewStatus}`);
+    }
     
     return true;
   } catch (error) {

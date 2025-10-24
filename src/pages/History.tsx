@@ -358,7 +358,36 @@ export default function History() {
                     <Clock className="w-4 h-4" />
                     <span>
                       {delivery.accepted_time && delivery.delivery_time ? 
-                                  `${Math.round((new Date(delivery.delivery_time).getTime() - new Date(delivery.accepted_time).getTime()) / 60000)} דקות` : 
+                        (() => {
+                          const totalMinutes = Math.round((new Date(delivery.delivery_time).getTime() - new Date(delivery.accepted_time).getTime()) / 60000);
+                          
+                          // Convert to appropriate time unit
+                          if (totalMinutes < 60) {
+                            // Less than 1 hour - show minutes
+                            return `${totalMinutes} דקות`;
+                          } else if (totalMinutes < 1440) {
+                            // Less than 1 day - show hours and minutes
+                            const hours = Math.floor(totalMinutes / 60);
+                            const minutes = totalMinutes % 60;
+                            return minutes > 0 
+                              ? `${hours}:${minutes.toString().padStart(2, '0')} שעות`
+                              : `${hours} שעות`;
+                          } else if (totalMinutes < 43200) {
+                            // Less than 30 days - show days and hours
+                            const days = Math.floor(totalMinutes / 1440);
+                            const hours = Math.floor((totalMinutes % 1440) / 60);
+                            return hours > 0
+                              ? `${days} ימים ו-${hours} שעות`
+                              : `${days} ימים`;
+                          } else {
+                            // More than 30 days - show months and days
+                            const months = Math.floor(totalMinutes / 43200);
+                            const days = Math.floor((totalMinutes % 43200) / 1440);
+                            return days > 0
+                              ? `${months} חודשים ו-${days} ימים`
+                              : `${months} חודשים`;
+                          }
+                        })() : 
                         'N/A'
                       }
                     </span>

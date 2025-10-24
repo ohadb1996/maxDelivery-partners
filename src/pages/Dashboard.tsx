@@ -57,16 +57,30 @@ export default function Dashboard() {
           const data = snapshot.val();
           let foundActiveDelivery = false;
           
-          // סטטוסים שמשמעותם משלוח פעיל
+          // ✅ סטטוסים שמשמעותם משלוח פעיל (אחרי קבלה)
           const activeStatuses = ['מקבל', 'הגיע לנקודת איסוף', 'נאסף', 'הגיע ליעד'];
           
           Object.keys(data).forEach((deliveryId) => {
             const delivery = data[deliveryId];
             
-            // בדוק אם המשלוח מוקצה לשליח הזה ויש לו סטטוס פעיל
-            if (delivery.assigned_courier === authUser.uid && 
-                activeStatuses.includes(delivery.status) &&
-                delivery.accepted_time) {
+            // ✅ STRICT: Check all conditions for an active delivery
+            const hasAssignedCourier = delivery.assigned_courier !== undefined && 
+                                       delivery.assigned_courier !== null && 
+                                       delivery.assigned_courier !== '';
+            const isAssignedToMe = hasAssignedCourier && delivery.assigned_courier === authUser.uid;
+            const isActiveStatus = delivery.status && activeStatuses.includes(delivery.status);
+            const hasAcceptedTime = delivery.accepted_time !== undefined && 
+                                    delivery.accepted_time !== null && 
+                                    delivery.accepted_time !== '';
+            
+            // ✅ NEW: Exclude "ready" statuses (those are available, not active)
+            const isNotReadyStatus = delivery.status !== 'מוכן לאיסוף' && 
+                                     delivery.status !== 'מוכן' && 
+                                     delivery.status !== 'ready' &&
+                                     delivery.status !== 'ממתין';
+            
+            // ✅ ALL conditions must be true
+            if (hasAssignedCourier && isAssignedToMe && isActiveStatus && hasAcceptedTime && isNotReadyStatus) {
               foundActiveDelivery = true;
               console.log(`✅ [Dashboard] Found active delivery: ${deliveryId} with status: ${delivery.status}`);
             }
