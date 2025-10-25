@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, X, Check, RotateCw, Upload } from "lucide-react";
+import { Camera, X, Check, RotateCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface PhotoCaptureProps {
@@ -13,11 +13,7 @@ interface PhotoCaptureProps {
 
 export default function PhotoCapture({ onPhotoCapture, isUploading, deliveryNumber, onReset }: PhotoCaptureProps) {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-  const [showCamera, setShowCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Open camera (mobile will show camera selector, desktop will show webcam)
   const openCamera = () => {
@@ -54,7 +50,6 @@ export default function PhotoCapture({ onPhotoCapture, isUploading, deliveryNumb
   const retakePhoto = () => {
     setCapturedPhoto(null);
     (window as any)._capturedPhotoFile = null;
-    setUploadProgress(0);
   };
 
   // Reset everything (for when stuck)
@@ -62,7 +57,6 @@ export default function PhotoCapture({ onPhotoCapture, isUploading, deliveryNumb
     console.log('📸 [PhotoCapture] Resetting all state...');
     setCapturedPhoto(null);
     (window as any)._capturedPhotoFile = null;
-    setUploadProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

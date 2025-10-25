@@ -3,8 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { User2, Phone, Mail, Bike, Car, Truck, Settings, X, CreditCard } from "lucide-react";
+import { User2, Phone, Mail, Bike, Car, Truck, Settings, X, CreditCard, Globe } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import LanguageSwitcher from "@/components/ui/LanguageSwitcher";
 import { VehicleType } from "@/types";
 import { updateEmail, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth, db } from "@/api/config/firebase.config";
@@ -590,6 +591,24 @@ export default function Profile() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Language Settings */}
+      <Card className="mb-4 border-2 border-gray-200">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                <Globe className="w-5 h-5 text-gray-600" />
+              </div>
+              <div className="text-right">
+                <h3 className="text-lg font-bold text-gray-900">שפה / Language</h3>
+                <p className="text-sm text-gray-600">בחר את שפת האפליקציה</p>
+              </div>
+            </div>
+            <LanguageSwitcher />
+          </div>
         </CardContent>
       </Card>
     </div>

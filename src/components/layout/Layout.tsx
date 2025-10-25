@@ -6,7 +6,6 @@ import SideNavigation from "./SideNavigation";
 import { Logo } from "../ui/Logo";
 import Toast from "../ui/Toast";
 import { useNewMessageNotifications } from "@/hooks/useNewMessageNotifications";
-import LanguageSwitcher from "../ui/LanguageSwitcher";
 import NotificationPanel from "../ui/NotificationPanel";
 import { ref, onValue, query, orderByChild, equalTo, update } from "firebase/database";
 import { db } from "@/api/config/firebase.config";
@@ -153,40 +152,36 @@ export default function Layout({ children }: LayoutProps) {
               </button>
               <Logo size="md" showText={false} />
               <div className="text-left">
-                <h1 className="text-lg font-bold text-gray-900">MaxDelivery partner</h1>
+                <h1 className="text-lg font-bold text-gray-900">MaxDelivery</h1>
                 {authUser && (
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${authUser.isAvailable ? 'bg-green-500' : 'bg-red-400'} animate-pulse`} />
                     <p className="text-xs text-gray-500">שלום, {authUser.username || authUser.email?.split('@')[0] || 'שליח'}</p>
                   </div> 
               )}
-                
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <LanguageSwitcher />
+            
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 rounded-lg transition-colors duration-200 text-gray-600 hover:bg-gray-100"
+              >
+                <Bell className="w-6 h-6" />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                )}
+              </button>
               
-              {/* Notification Bell */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-lg transition-colors duration-200 text-gray-600 hover:bg-gray-100"
-                >
-                  <Bell className="w-6 h-6" />
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-                  )}
-                </button>
-                
-                {/* Notification Panel */}
-                <NotificationPanel
-                  isOpen={showNotifications}
-                  onClose={() => setShowNotifications(false)}
-                  notifications={notifications}
-                  onMarkAllAsRead={handleMarkAllAsRead}
-                  onMarkAsRead={handleMarkAsRead}
-                />
-              </div>
+              {/* Notification Panel */}
+              <NotificationPanel
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
+                notifications={notifications}
+                onMarkAllAsRead={handleMarkAllAsRead}
+                onMarkAsRead={handleMarkAsRead}
+              />
             </div>
           </div>
         </div>

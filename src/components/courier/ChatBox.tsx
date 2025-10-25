@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { X, Send, MessageCircle, MapPin, User, Package } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ref, onValue, push, set, serverTimestamp, get } from "firebase/database";
+import { X, Send, MessageCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { ref, onValue, push, set, get } from "firebase/database";
 import { db } from "@/api/config/firebase.config";
 import { useAuth } from "@/context/AuthContext";
 

@@ -5,11 +5,63 @@ interface Location {
   lat: number;
   lng: number;
   timestamp: number;
+  address?: string; // Reverse geocoded address
 }
 
 let watchId: number | null = null;
 let currentCourierId: string | null = null;
 let currentDeliveryId: string | null = null;
+
+/**
+ * Reverse geocode coordinates to address using Nominatim (OpenStreetMap)
+ * @param lat - Latitude
+ * @param lng - Longitude
+ * @returns Address string in Hebrew if available
+ */
+const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=he`,
+      {
+        headers: {
+          'User-Agent': 'MaxDelivery Courier App'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error('Geocoding failed');
+    }
+    
+    const data = await response.json();
+    
+    // Build address from components
+    const address = data.address;
+    const parts: string[] = [];
+    
+    // Add street and house number
+    if (address.road) {
+      parts.push(address.road);
+      if (address.house_number) {
+        parts[0] += ` ${address.house_number}`;
+      }
+    }
+    
+    // Add city/town
+    if (address.city) {
+      parts.push(address.city);
+    } else if (address.town) {
+      parts.push(address.town);
+    } else if (address.village) {
+      parts.push(address.village);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : data.display_name;
+  } catch (error) {
+    console.error('❌ [ReverseGeocode] Error:', error);
+    throw error;
+  }
+};
 
 /**
  * Start tracking courier location and update Firebase
@@ -34,12 +86,20 @@ export const startLocationTracking = (courierId: string, deliveryId: string) => 
 
   // Watch position with high accuracy
   watchId = navigator.geolocation.watchPosition(
-    (position) => {
+    async (position) => {
       const location: Location = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
         timestamp: Date.now(),
       };
+
+      // Get address from coordinates (reverse geocoding)
+      try {
+        const address = await reverseGeocode(location.lat, location.lng);
+        location.address = address;
+      } catch (error) {
+        console.log('⚠️ [LocationTracking] Could not reverse geocode location');
+      }
 
       // Update Firebase with current location
       updateLocationInFirebase(location);

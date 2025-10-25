@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, Phone, MapPin, Package, CheckCircle, ArrowRight, MessageCircle } from "lucide-react";
+import { Navigation, Phone, MapPin, Package, CheckCircle, ArrowRight, MessageCircle, Locate } from "lucide-react";
 import { motion } from "framer-motion";
 import { Delivery } from "@/types";
 import { updateDeliveryStatus } from "@/services/deliveryService";
@@ -78,12 +78,31 @@ export default function ActiveJob() {
   // ✅ Chat feature
   const [isChatOpen, setIsChatOpen] = useState(false);
   const unreadCount = useUnreadMessages(delivery?.id, "courier");
+  // ✅ Courier current location
+  const [courierCurrentAddress, setCourierCurrentAddress] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
     loadActiveDelivery();
     }
   }, [user]);
+
+  // ✅ Listen to courier's current location for address display
+  useEffect(() => {
+    if (!user?.uid || !delivery?.id) return;
+
+    const locationRef = ref(db, `Deliveries/${delivery.id}/courier_current_location`);
+    const unsubscribe = onValue(locationRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const location = snapshot.val();
+        if (location.address) {
+          setCourierCurrentAddress(location.address);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, delivery?.id]);
 
   const loadActiveDelivery = async () => {
     if (!user) return;
@@ -796,6 +815,21 @@ export default function ActiveJob() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
+        {/* Courier Current Location Display */}
+        {courierCurrentAddress && (
+          <Card className="mb-3 border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Locate className="w-4 h-4 text-green-600 animate-pulse" />
+                <div className="flex-1">
+                  <p className="text-xs text-green-700 font-medium">📍 המיקום שלך כרגע:</p>
+                  <p className="text-sm font-bold text-green-900">{courierCurrentAddress}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="mb-4 border-2 border-blue-200">
           <CardContent className="p-4">
             {batchDelivery && (
