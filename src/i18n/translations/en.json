@@ -1,0 +1,63 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "yes": "Yes",
+    "no": "No",
+    "close": "Close"
+  },
+  "dashboard": {
+    "title": "Available Deliveries 📦",
+    "greeting": "Hello {name}",
+    "available": "Available for deliveries",
+    "offline": "Not available",
+    "noDeliveries": "No available deliveries",
+    "acceptDelivery": "Accept Delivery",
+    "viewRoute": "View Route"
+  },
+  "active": {
+    "title": "Active Delivery",
+    "pickup": "Pickup",
+    "delivery": "Delivery",
+    "arrived": "I've arrived",
+    "completed": "Completed",
+    "customer": "Customer",
+    "phone": "Phone",
+    "address": "Address",
+    "package": "Package",
+    "businessConfirmation": "Waiting for business confirmation"
+  },
+  "history": {
+    "title": "History 📋",
+    "completed": "Completed Deliveries",
+    "earnings": "Earnings",
+    "noHistory": "No delivery history"
+  },
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "logout": "Logout"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "active": "Active",
+    "history": "History",
+    "profile": "Profile"
+  },
+  "chat": {
+    "newMessage": "New Message",
+    "from": "From:",
+    "clickToOpen": "Click to open chat",
+    "sendMessage": "Send Message",
+    "close": "Close"
+  }
+}
+
+

@@ -1,18 +1,123 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import SideNavigation from "./SideNavigation";
 import { Logo } from "../ui/Logo";
+import Toast from "../ui/Toast";
+import { useNewMessageNotifications } from "@/hooks/useNewMessageNotifications";
+import LanguageSwitcher from "../ui/LanguageSwitcher";
+import NotificationPanel from "../ui/NotificationPanel";
+import { ref, onValue, query, orderByChild, equalTo, update } from "firebase/database";
+import { db } from "@/api/config/firebase.config";
 
 interface LayoutProps {
   children: React.ReactNode;
+}
+
+interface Notification {
+  id: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+  type: 'assignment' | 'pickup' | 'completion' | 'cancelled' | 'ready' | 'new_message' | 'general';
 }
 
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { user: authUser, isLoading } = useAuth();
   const [isSideNavOpen, setIsSideNavOpen] = useState(false);
+  
+  // ✅ Message notifications
+  const [showToast, setShowToast] = useState(false);
+  const [toastData, setToastData] = useState<{ deliveryId: string; senderName: string; text: string } | null>(null);
+  const newMessage = useNewMessageNotifications(authUser?.uid, "courier");
+  
+  // ✅ Notification panel
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // ✅ Handle new message notifications
+  useEffect(() => {
+    if (newMessage) {
+      console.log('🔔 Showing toast for new message:', newMessage);
+      setToastData({
+        deliveryId: newMessage.deliveryId,
+        senderName: newMessage.senderName,
+        text: newMessage.text,
+      });
+      setShowToast(true);
+    }
+  }, [newMessage]);
+
+  // ✅ Load real-time notifications from Firebase
+  useEffect(() => {
+    if (!authUser?.uid) {
+      console.log('❌ [CourierNotifications] No courier UID');
+      return;
+    }
+
+    console.log('🔔 [CourierNotifications] Setting up listener for courier:', authUser.uid);
+
+    const notificationsRef = query(
+      ref(db, 'CourierNotifications'),
+      orderByChild('courierId'),
+      equalTo(authUser.uid)
+    );
+
+    const unsubscribe = onValue(notificationsRef, (snapshot) => {
+      console.log('🔔 [CourierNotifications] Received data:', snapshot.exists());
+      const fetchedNotifications: Notification[] = [];
+      snapshot.forEach((childSnapshot) => {
+        const notification = childSnapshot.val();
+        console.log('🔔 [CourierNotifications] Processing notification:', childSnapshot.key, notification);
+        fetchedNotifications.push({
+          id: childSnapshot.key!,
+          message: notification.message,
+          timestamp: new Date(notification.timestamp),
+          read: notification.read || false,
+          type: notification.type || 'general',
+        });
+      });
+      // Sort by timestamp, newest first
+      fetchedNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      console.log('🔔 [CourierNotifications] Total notifications:', fetchedNotifications.length);
+      setNotifications(fetchedNotifications);
+    }, (error) => {
+      console.error('❌ [CourierNotifications] Error:', error);
+    });
+
+    return () => unsubscribe();
+  }, [authUser]);
+
+  const handleMarkAllAsRead = async () => {
+    if (!authUser?.uid) return;
+    
+    try {
+      const updates: Record<string, any> = {};
+      notifications.forEach((notification) => {
+        if (!notification.read) {
+          updates[`${notification.id}/read`] = true;
+        }
+      });
+      
+      if (Object.keys(updates).length > 0) {
+        const notificationsRef = ref(db, 'CourierNotifications');
+        await update(notificationsRef, updates);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      const notificationRef = ref(db, `CourierNotifications/${id}`);
+      await update(notificationRef, { read: true });
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
+  };
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -58,6 +163,31 @@ export default function Layout({ children }: LayoutProps) {
                 
               </div>
             </div>
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative p-2 rounded-lg transition-colors duration-200 text-gray-600 hover:bg-gray-100"
+                >
+                  <Bell className="w-6 h-6" />
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                  )}
+                </button>
+                
+                {/* Notification Panel */}
+                <NotificationPanel
+                  isOpen={showNotifications}
+                  onClose={() => setShowNotifications(false)}
+                  notifications={notifications}
+                  onMarkAllAsRead={handleMarkAllAsRead}
+                  onMarkAsRead={handleMarkAsRead}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -72,6 +202,20 @@ export default function Layout({ children }: LayoutProps) {
         isOpen={isSideNavOpen} 
         onToggle={() => setIsSideNavOpen(!isSideNavOpen)} 
       />
+
+      {/* ✅ Toast Notification for new messages */}
+      {showToast && toastData && (
+        <Toast
+          message={toastData.text}
+          senderName={toastData.senderName}
+          onClose={() => setShowToast(false)}
+          onClick={() => {
+            // Navigate to active job
+            navigate('/active');
+            setShowToast(false);
+          }}
+        />
+      )}
     </div>
   );
 }

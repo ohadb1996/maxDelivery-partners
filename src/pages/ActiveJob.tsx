@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, Phone, MapPin, Package, CheckCircle, ArrowRight } from "lucide-react";
+import { Navigation, Phone, MapPin, Package, CheckCircle, ArrowRight, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Delivery } from "@/types";
 import { updateDeliveryStatus } from "@/services/deliveryService";
@@ -12,6 +12,11 @@ import { ref, onValue, get, update } from 'firebase/database';
 import { db } from "@/api/config/firebase.config";
 
 import StatusTimeline from "@/components/courier/StatusTimeline";
+import ChatBox from "@/components/courier/ChatBox";
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
+// ⚠️ Photo feature temporarily disabled - enable when Firebase Storage is configured
+// import PhotoCapture from "@/components/courier/PhotoCapture";
+// import { uploadDeliveryPhoto, compressImage } from "@/services/photoUploadService";
 
 // ממשק למשלוח מה-DB
 interface DBDelivery {
@@ -66,6 +71,13 @@ export default function ActiveJob() {
   const [courierArrivedPickup2, setCourierArrivedPickup2] = useState(false);
   const [business1ConfirmedPickup, setBusiness1ConfirmedPickup] = useState(false);
   const [business2ConfirmedPickup, setBusiness2ConfirmedPickup] = useState(false);
+  // ⚠️ Photo feature temporarily disabled
+  // const [delivery1PhotoUrl, setDelivery1PhotoUrl] = useState<string | null>(null);
+  // const [delivery2PhotoUrl, setDelivery2PhotoUrl] = useState<string | null>(null);
+  // const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  // ✅ Chat feature
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const unreadCount = useUnreadMessages(delivery?.id, "courier");
 
   useEffect(() => {
     if (user) {
@@ -99,7 +111,13 @@ export default function ActiveJob() {
         console.log('📦 [ActiveJob] Scanning all deliveries for courier assignments...');
         
         // Statuses that mean the delivery is active (accepted but not completed)
-        const activeStatuses = ['מקבל', 'הגיע לנקודת איסוף', 'נאסף', 'הגיע ליעד'];
+        const activeStatuses = [
+          'מקבל', 'accepted',
+          'הגיע לנקודת איסוף', 'arrived_pickup',
+          'נאסף', 'picked_up',
+          'הגיע ליעד', 'arrived_delivery',
+          'courier_at_pickup1', 'courier_at_pickup2'
+        ];
         
         snapshot.forEach((childSnapshot) => {
           const deliveryData = childSnapshot.val() as DBDelivery;
@@ -111,9 +129,14 @@ export default function ActiveJob() {
                                      deliveryData.assigned_courier !== '';
           const isAssignedToMe = hasAssignedCourier && deliveryData.assigned_courier === user.uid;
           const isActiveStatus = deliveryData.status && activeStatuses.includes(deliveryData.status);
-          const hasAcceptedTime = deliveryData.accepted_time !== undefined && 
-                                  deliveryData.accepted_time !== null && 
-                                  deliveryData.accepted_time !== '';
+          
+          // ✅ RELAXED: Accept either accepted_time OR pickup_time (for batches confirmed by business)
+          const hasAcceptedTime = (deliveryData.accepted_time !== undefined && 
+                                   deliveryData.accepted_time !== null && 
+                                   deliveryData.accepted_time !== '') ||
+                                  (deliveryData.pickup_time !== undefined && 
+                                   deliveryData.pickup_time !== null && 
+                                   deliveryData.pickup_time !== '');
           
           // ✅ NEW: Check that the status is NOT "מוכן לאיסוף" or "ready" (those are available, not active)
           const isNotReadyStatus = deliveryData.status !== 'מוכן לאיסוף' && 
@@ -121,17 +144,25 @@ export default function ActiveJob() {
                                    deliveryData.status !== 'ready' &&
                                    deliveryData.status !== 'ממתין';
           
-          console.log(`📦 [ActiveJob] Checking delivery ${deliveryId}:`, {
-            status: deliveryData.status,
-            assigned_courier: deliveryData.assigned_courier || 'NONE',
-            currentCourier: user.uid,
-            hasAssignedCourier,
-            isAssignedToMe,
-            isActiveStatus,
-            hasAcceptedTime,
-            isNotReadyStatus,
-            accepted_time: deliveryData.accepted_time || 'NONE'
-          });
+          // Log ALL deliveries with picked_up or נאסף status to debug the issue
+          if (deliveryData.status === 'picked_up' || deliveryData.status === 'נאסף' || 
+              deliveryData.status === 'arrived_delivery' || deliveryData.status === 'הגיע ליעד') {
+            console.log(`🔍 [ActiveJob] Found delivery with status ${deliveryData.status}:`, {
+              deliveryId,
+              status: deliveryData.status,
+              assigned_courier: deliveryData.assigned_courier || 'NONE',
+              currentCourier: user.uid,
+              accepted_time: deliveryData.accepted_time || 'NONE',
+              pickup_time: deliveryData.pickup_time || 'NONE',
+              is_batched: deliveryData.is_batched,
+              hasAssignedCourier,
+              isAssignedToMe,
+              isActiveStatus,
+              hasAcceptedTime,
+              isNotReadyStatus,
+              PASSES: hasAssignedCourier && isAssignedToMe && isActiveStatus && hasAcceptedTime && isNotReadyStatus
+            });
+          }
           
           // ✅ MUST meet ALL conditions:
           // 1. Has assigned_courier field (not null/empty)
@@ -292,9 +323,19 @@ export default function ActiveJob() {
     }
   };
   
-  const mapStatusToEnglish = (hebrewStatus: string): Delivery['status'] => {
+  const mapStatusToEnglish = (status: string): Delivery['status'] => {
+    // If already in English, return as-is
+    const englishStatuses = ['available', 'accepted', 'arrived_pickup', 'picked_up', 'arrived_delivery', 'delivered', 'cancelled'];
+    if (englishStatuses.includes(status as Delivery['status'])) {
+      return status as Delivery['status'];
+    }
+    
+    // Otherwise map from Hebrew
     const mapping: Record<string, Delivery['status']> = {
       'ממתין': 'available',
+      'מוכן לאיסוף': 'available',
+      'מוכן': 'available',
+      'ready': 'available',
       'מקבל': 'accepted',
       'הגיע לנקודת איסוף': 'arrived_pickup',
       'נאסף': 'picked_up',
@@ -302,7 +343,7 @@ export default function ActiveJob() {
       'הושלם': 'delivered',
       'בוטל': 'cancelled'
     };
-    return mapping[hebrewStatus] || 'available';
+    return mapping[status] || 'available';
   };
   
   const mapVehicleType = (hebrewType: string): 'bike' | 'motorcycle' | 'car' | 'truck' => {
@@ -394,6 +435,16 @@ export default function ActiveJob() {
         updated_at: timestamp
       });
       
+      // ✅ Also update batch partner so both deliveries know courier is at pickup 1
+      if (batchDelivery) {
+        const batchDeliveryRef = ref(db, `Deliveries/${batchDelivery.id}`);
+        await update(batchDeliveryRef, {
+          courier_arrived_pickup1: true,
+          status: 'courier_at_pickup1',
+          updated_at: timestamp
+        });
+      }
+      
       setCourierArrivedPickup1(true);
       console.log('✅ [ActiveJob] Marked arrived at business 1');
     } catch (error) {
@@ -419,6 +470,16 @@ export default function ActiveJob() {
         status: 'courier_at_pickup2',
         updated_at: timestamp
       });
+      
+      // ✅ Also update batch partner so both deliveries know courier is at pickup 2
+      if (batchDelivery) {
+        const batchDeliveryRef = ref(db, `Deliveries/${batchDelivery.id}`);
+        await update(batchDeliveryRef, {
+          courier_arrived_pickup2: true,
+          status: 'courier_at_pickup2',
+          updated_at: timestamp
+        });
+      }
       
       setCourierArrivedPickup2(true);
       console.log('✅ [ActiveJob] Marked arrived at business 2');
@@ -491,6 +552,94 @@ export default function ActiveJob() {
     setIsUpdating(false);
   };
 
+  // ⚠️ Photo feature temporarily disabled - uncomment when Firebase Storage is enabled
+  /*
+  const handleDelivery1Photo = async (photoFile: File) => {
+    if (!user || !delivery) return;
+    
+    setIsUploadingPhoto(true);
+    try {
+      console.log('📸 [ActiveJob] Uploading delivery 1 photo...');
+      console.log('📸 [ActiveJob] File size:', photoFile.size, 'bytes');
+      
+      const compressedFile = await compressImage(photoFile, 1200, 0.8);
+      console.log('📸 [ActiveJob] Compressed size:', compressedFile.size, 'bytes');
+      
+      const photoUrl = await uploadDeliveryPhoto(compressedFile, delivery.id, user.uid);
+      console.log('📸 [ActiveJob] Upload successful! URL:', photoUrl);
+      
+      const deliveryRef = ref(db, `Deliveries/${delivery.id}`);
+      await update(deliveryRef, {
+        delivery1_photo_url: photoUrl,
+        delivery1_photo_timestamp: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      
+      setDelivery1PhotoUrl(photoUrl);
+      console.log('✅ [ActiveJob] Delivery 1 photo uploaded successfully');
+      
+      await completeDelivery1();
+    } catch (error: any) {
+      console.error('❌ [ActiveJob] Error uploading delivery 1 photo:', error);
+      alert(`שגיאה בהעלאת התמונה: ${error.message || 'אנא נסה שוב'}`);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleDelivery2Photo = async (photoFile: File) => {
+    if (!user || !delivery) return;
+    
+    setIsUploadingPhoto(true);
+    try {
+      console.log('📸 [ActiveJob] Uploading delivery 2 photo...');
+      const compressedFile = await compressImage(photoFile, 1200, 0.8);
+      const photoUrl = await uploadDeliveryPhoto(compressedFile, delivery.id, user.uid);
+      
+      const deliveryRef = ref(db, `Deliveries/${delivery.id}`);
+      await update(deliveryRef, {
+        delivery2_photo_url: photoUrl,
+        delivery2_photo_timestamp: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      
+      setDelivery2PhotoUrl(photoUrl);
+      await completeDelivery2();
+    } catch (error: any) {
+      console.error('❌ [ActiveJob] Error uploading delivery 2 photo:', error);
+      alert(`שגיאה בהעלאת התמונה: ${error.message || 'אנא נסה שוב'}`);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleSingleDeliveryPhoto = async (photoFile: File) => {
+    if (!user || !delivery) return;
+    
+    setIsUploadingPhoto(true);
+    try {
+      console.log('📸 [ActiveJob] Uploading delivery photo...');
+      const compressedFile = await compressImage(photoFile, 1200, 0.8);
+      const photoUrl = await uploadDeliveryPhoto(compressedFile, delivery.id, user.uid);
+      
+      const deliveryRef = ref(db, `Deliveries/${delivery.id}`);
+      await update(deliveryRef, {
+        proof_photo_url: photoUrl,
+        proof_photo_timestamp: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      
+      setDelivery1PhotoUrl(photoUrl);
+      await updateStatus("delivered");
+    } catch (error: any) {
+      console.error('❌ [ActiveJob] Error uploading delivery photo:', error);
+      alert(`שגיאה בהעלאת התמונה: ${error.message || 'אנא נסה שוב'}`);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+  */
+
   const openGoogleMaps = (address: string) => {
     const encodedAddress = encodeURIComponent(address);
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, "_blank");
@@ -531,6 +680,20 @@ export default function ActiveJob() {
 
   const getNextAction = () => {
     const isCrossBusiness = batchDelivery && (batchDelivery as any)._isCrossBusiness;
+    const isSingleBusinessBatch = batchDelivery && !isCrossBusiness;
+    
+    console.log('🎯 [ActiveJob] getNextAction:', {
+      status: delivery.status,
+      hasBatchDelivery: !!batchDelivery,
+      batchType: batchDelivery ? (batchDelivery as any).batch_type : 'N/A',
+      _isCrossBusiness: batchDelivery ? (batchDelivery as any)._isCrossBusiness : 'N/A',
+      isCrossBusiness,
+      isSingleBusinessBatch,
+      courierArrivedPickup1,
+      business1ConfirmedPickup,
+      courierArrivedPickup2,
+      business2ConfirmedPickup
+    });
     
     // ✅ STRICT ENFORCEMENT: Cross-business batch workflow
     if (isCrossBusiness) {
@@ -595,8 +758,14 @@ export default function ActiveJob() {
       case "arrived_pickup":
         return { label: "אספתי את החבילה", status: "picked_up", color: "orange" };
       case "picked_up":
+        // Always show "arrived at delivery" button after pickup, regardless of batch type
         return { label: "הגעתי ליעד", status: "arrived_delivery", color: "purple" };
       case "arrived_delivery":
+        // For single-business batch, separate completion buttons will be shown below
+        // For regular deliveries, show single completion button
+        if (isSingleBusinessBatch) {
+          return null; // Separate buttons will be rendered below
+        }
         return { label: "השלמתי את המשלוח", status: "delivered", color: "green" };
       case "courier_at_pickup1" as any:
       case "courier_at_pickup2" as any:
@@ -610,6 +779,16 @@ export default function ActiveJob() {
   const nextAction = getNextAction();
   const showPickupNav = delivery.status === "accepted" || delivery.status === "arrived_pickup" || (delivery.status as any) === "courier_at_pickup1" || (delivery.status as any) === "courier_at_pickup2";
   const showDeliveryNav = delivery.status === "picked_up" || delivery.status === "arrived_delivery";
+  
+  console.log('🎯 [ActiveJob] Button Display Check:', {
+    status: delivery.status,
+    nextAction: nextAction ? nextAction.label : 'null',
+    showPickupNav,
+    showDeliveryNav,
+    isBatch: !!batchDelivery,
+    delivery1Completed,
+    delivery2Completed
+  });
 
   return (
     <div className="p-4 pb-6">
@@ -994,74 +1173,50 @@ export default function ActiveJob() {
           )}
         </div>
 
-        {/* ✅ Separate completion buttons for batch deliveries */}
+        {/* ✅ Completion buttons for batch deliveries (photos disabled) */}
         {batchDelivery && delivery.status === "arrived_delivery" ? (
           <div className="mt-4 space-y-3">
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 mb-3">
-              <p className="text-sm font-bold text-blue-900 text-center">
-                📦 משלוח כפול - סמן כל לקוח בנפרד לאחר המסירה
-              </p>
-            </div>
-            
-            {/* First Delivery Button */}
-            <Button
-              onClick={completeDelivery1}
-              disabled={isUpdating || delivery1Completed}
-              className={`w-full font-semibold py-6 text-lg ${
-                delivery1Completed
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : (batchDelivery as any)._isCrossBusiness
-                    ? 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800'
-                    : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-              } text-white`}
-            >
-              {delivery1Completed ? (
-                <span className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  ✓ משלוח ראשון הושלם ({delivery.customer_name})
-                </span>
-              ) : isUpdating ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  מעדכן...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  השלמתי משלוח ראשון ({delivery.customer_name})
-                </span>
-              )}
-            </Button>
+            {/* First Delivery - Completion Button */}
+            {!delivery1Completed ? (
+              <Button
+                onClick={completeDelivery1}
+                disabled={isUpdating}
+                className="w-full gap-2 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white py-6 text-lg font-bold"
+              >
+                <CheckCircle className="w-5 h-5" />
+                השלמתי משלוח ראשון - {delivery.customer_name}
+              </Button>
+            ) : (
+              <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="flex items-center gap-2 justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="font-bold text-green-900">
+                    ✓ משלוח ראשון הושלם ({delivery.customer_name})
+                  </p>
+                </div>
+              </div>
+            )}
 
-            {/* Second Delivery Button */}
-            <Button
-              onClick={completeDelivery2}
-              disabled={isUpdating || delivery2Completed}
-              className={`w-full font-semibold py-6 text-lg ${
-                delivery2Completed
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : (batchDelivery as any)._isCrossBusiness
-                    ? 'bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800'
-                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
-              } text-white`}
-            >
-              {delivery2Completed ? (
-                <span className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  ✓ משלוח שני הושלם ({batchDelivery.customer_name})
-                </span>
-              ) : isUpdating ? (
-                <span className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  מעדכן...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  השלמתי משלוח שני ({batchDelivery.customer_name})
-                </span>
-              )}
-            </Button>
+            {/* Second Delivery - Completion Button */}
+            {delivery1Completed && !delivery2Completed ? (
+              <Button
+                onClick={completeDelivery2}
+                disabled={isUpdating}
+                className="w-full gap-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white py-6 text-lg font-bold"
+              >
+                <CheckCircle className="w-5 h-5" />
+                השלמתי משלוח שני - {batchDelivery.customer_name}
+              </Button>
+            ) : delivery2Completed ? (
+              <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="flex items-center gap-2 justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="font-bold text-green-900">
+                    ✓ משלוח שני הושלם ({batchDelivery.customer_name})
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             {/* Show success message when both completed */}
             {delivery1Completed && delivery2Completed && (
@@ -1074,6 +1229,18 @@ export default function ActiveJob() {
                 </p>
               </div>
             )}
+          </div>
+        ) : delivery.status === "arrived_delivery" && !batchDelivery ? (
+          /* ✅ Single delivery - completion button (photos disabled) */
+          <div className="mt-4">
+            <Button
+              onClick={() => updateStatus("delivered")}
+              disabled={isUpdating}
+              className="w-full gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-6 text-lg font-bold"
+            >
+              <CheckCircle className="w-5 h-5" />
+              השלמתי את המשלוח
+            </Button>
           </div>
         ) : nextAction && (
           <Button
@@ -1088,7 +1255,7 @@ export default function ActiveJob() {
             disabled={isUpdating || (nextAction as any).disabled}
             className={`w-full mt-4 font-semibold py-6 text-lg ${
               nextAction.color === 'green' 
-                ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' 
                 : nextAction.color === 'orange'
                 ? 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800'
                 : nextAction.color === 'yellow'
@@ -1119,6 +1286,33 @@ export default function ActiveJob() {
           </Button>
         )}
       </motion.div>
+
+      {/* ✅ Floating Chat Button */}
+      {delivery && !isChatOpen && (
+        <div className="fixed bottom-6 left-6 z-40">
+          <Button
+            onClick={() => setIsChatOpen(true)}
+            className="relative w-14 h-14 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-2xl"
+          >
+            <MessageCircle className="w-6 h-6" />
+            {/* Unread Badge */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border-2 border-white shadow-lg animate-pulse">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* ✅ Chat Box */}
+      {delivery && isChatOpen && (
+        <ChatBox
+          deliveryId={delivery.id}
+          businessName={delivery.business_name || "העסק"}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

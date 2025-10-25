@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
 import Layout from './components/layout/Layout'
 import Dashboard from './pages/Dashboard'
 import ActiveJob from './pages/ActiveJob'
@@ -11,8 +12,9 @@ import Register from './pages/Register'
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <LanguageProvider>
+      <AuthProvider>
+        <Router>
         <Routes>
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} />
@@ -47,6 +49,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+    </LanguageProvider>
   )
 }
 

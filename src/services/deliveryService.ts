@@ -1,4 +1,4 @@
-import { getDatabase, ref, get, onValue, update, set } from 'firebase/database';
+import { getDatabase, ref, get, onValue, update, set, push } from 'firebase/database';
 import { app } from '../api/config/firebase.config';
 import { Delivery, VehicleType } from '@/types';
 
@@ -368,6 +368,33 @@ export const assignBatchToCourier = async (
       console.log(`✅ [DeliveryService] Added delivery ${deliveryId} to courier's CollectedDeliveries`);
     }
     
+    // Create notifications for the business (one notification for the batch)
+    try {
+      const courierRef = ref(db, `Couriers/${courierId}`);
+      const courierSnapshot = await get(courierRef);
+      const courierName = courierSnapshot.exists() ? (courierSnapshot.val().username || 'שליח') : 'שליח';
+      
+      // Get first delivery data for business_id
+      const firstDeliveryRef = ref(db, `Deliveries/${deliveryIds[0]}`);
+      const firstDeliverySnapshot = await get(firstDeliveryRef);
+      const firstDeliveryData = firstDeliverySnapshot.val();
+      
+      const notificationsRef = ref(db, 'Notifications');
+      await push(notificationsRef, {
+        businessId: firstDeliveryData.business_id || '',
+        courierId,
+        deliveryId: deliveryIds[0], // Use first delivery ID
+        type: 'assignment',
+        message: `שליח ${courierName} שובץ למשלוח כפול (${deliveryIds.length} משלוחים)`,
+        courierName,
+        timestamp: new Date().toISOString(),
+        read: false,
+      });
+      console.log('✅ [DeliveryService] Created batch assignment notification');
+    } catch (error) {
+      console.error('❌ [DeliveryService] Error creating batch notification:', error);
+    }
+    
     console.log(`✅ [DeliveryService] Successfully assigned batch to courier`);
     return true;
   } catch (error) {
@@ -422,6 +449,29 @@ export const assignDeliveryToCourier = async (
     });
     
     console.log(`✅ [DeliveryService] Added delivery to courier's CollectedDeliveries`);
+    
+    // 3. Create notification for business
+    try {
+      const courierRef = ref(db, `Couriers/${courierId}`);
+      const courierSnapshot = await get(courierRef);
+      const courierName = courierSnapshot.exists() ? (courierSnapshot.val().username || 'שליח') : 'שליח';
+      
+      const notificationsRef = ref(db, 'Notifications');
+      await push(notificationsRef, {
+        businessId: deliveryData.business_id || '',
+        courierId,
+        deliveryId,
+        type: 'assignment',
+        message: `שליח ${courierName} שובץ למשלוח ל-${deliveryData.customer_name || 'לקוח'}`,
+        customerName: deliveryData.customer_name || '',
+        courierName,
+        timestamp: new Date().toISOString(),
+        read: false,
+      });
+      console.log('✅ [DeliveryService] Created assignment notification');
+    } catch (error) {
+      console.error('❌ [DeliveryService] Error creating assignment notification:', error);
+    }
     
     return true;
   } catch (error) {
@@ -485,6 +535,9 @@ export const updateDeliveryStatus = async (
       updates.delivery_time = timestamp;
     }
     
+    // Store original status for notifications
+    const originalStatus = newStatus;
+    
     // ✅ If this is a batched delivery, update ALL deliveries in the batch
     if (isBatched && batchId) {
       console.log(`📦 [DeliveryService] This is a batched delivery, finding all deliveries in batch ${batchId}`);
@@ -532,6 +585,67 @@ export const updateDeliveryStatus = async (
       });
       
       console.log(`✅ [DeliveryService] Updated single delivery status to ${hebrewStatus}`);
+    }
+    
+    // Create notifications based on status
+    try {
+      if (originalStatus === 'picked_up') {
+        // Notification for business
+        const businessNotifRef = ref(db, 'Notifications');
+        await push(businessNotifRef, {
+          businessId: deliveryData.business_id || '',
+          courierId,
+          deliveryId,
+          type: 'pickup',
+          message: `החבילה מ-${deliveryData.business_name || 'העסק'} נאספה`,
+          businessName: deliveryData.business_name || '',
+          timestamp: new Date().toISOString(),
+          read: false,
+        });
+        console.log('✅ [DeliveryService] Created pickup notification for business');
+        
+        // Notification for courier
+        const courierNotifRef = ref(db, 'CourierNotifications');
+        await push(courierNotifRef, {
+          courierId,
+          deliveryId,
+          type: 'pickup',
+          message: `אספת חבילה מ-${deliveryData.business_name || 'העסק'}`,
+          businessName: deliveryData.business_name || '',
+          timestamp: new Date().toISOString(),
+          read: false,
+        });
+        console.log('✅ [DeliveryService] Created pickup notification for courier');
+      } else if (originalStatus === 'delivered') {
+        // Notification for business
+        const businessNotifRef = ref(db, 'Notifications');
+        await push(businessNotifRef, {
+          businessId: deliveryData.business_id || '',
+          courierId,
+          deliveryId,
+          type: 'completion',
+          message: `המשלוח ל-${deliveryData.customer_name || 'לקוח'} הושלם בהצלחה`,
+          customerName: deliveryData.customer_name || '',
+          timestamp: new Date().toISOString(),
+          read: false,
+        });
+        console.log('✅ [DeliveryService] Created completion notification for business');
+        
+        // Notification for courier
+        const courierNotifRef = ref(db, 'CourierNotifications');
+        await push(courierNotifRef, {
+          courierId,
+          deliveryId,
+          type: 'completion',
+          message: `השלמת משלוח ל-${deliveryData.customer_name || 'לקוח'} בהצלחה`,
+          customerName: deliveryData.customer_name || '',
+          timestamp: new Date().toISOString(),
+          read: false,
+        });
+        console.log('✅ [DeliveryService] Created completion notification for courier');
+      }
+    } catch (error) {
+      console.error('❌ [DeliveryService] Error creating status notification:', error);
     }
     
     return true;

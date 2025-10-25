@@ -1,0 +1,63 @@
+{
+  "common": {
+    "loading": "טוען...",
+    "save": "שמור",
+    "cancel": "ביטול",
+    "delete": "מחק",
+    "edit": "ערוך",
+    "back": "חזור",
+    "next": "הבא",
+    "yes": "כן",
+    "no": "לא",
+    "close": "סגור"
+  },
+  "dashboard": {
+    "title": "משלוחים זמינים 📦",
+    "greeting": "שלום {name}",
+    "available": "זמין לקבלת משלוחים",
+    "offline": "לא זמין",
+    "noDeliveries": "אין משלוחים זמינים",
+    "acceptDelivery": "קבל משלוח",
+    "viewRoute": "צפה במסלול"
+  },
+  "active": {
+    "title": "משלוח פעיל",
+    "pickup": "איסוף",
+    "delivery": "משלוח",
+    "arrived": "הגעתי ליעד",
+    "completed": "השלמתי את המשלוח",
+    "customer": "לקוח",
+    "phone": "טלפון",
+    "address": "כתובת",
+    "package": "חבילה",
+    "businessConfirmation": "ממתין לאישור עסק"
+  },
+  "history": {
+    "title": "היסטוריה 📋",
+    "completed": "משלוחים שהושלמו",
+    "earnings": "הכנסות",
+    "noHistory": "אין היסטוריית משלוחים"
+  },
+  "profile": {
+    "title": "פרופיל",
+    "name": "שם",
+    "email": "אימייל",
+    "phone": "טלפון",
+    "logout": "התנתק"
+  },
+  "nav": {
+    "dashboard": "דשבורד",
+    "active": "פעיל",
+    "history": "היסטוריה",
+    "profile": "פרופיל"
+  },
+  "chat": {
+    "newMessage": "הודעה חדשה",
+    "from": "מ:",
+    "clickToOpen": "לחץ כדי לפתוח את הצ'אט",
+    "sendMessage": "שלח הודעה",
+    "close": "סגור"
+  }
+}
+
+
